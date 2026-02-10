@@ -22,6 +22,7 @@ FIELD_MAP = {
     'complemento_remunerativo':  'complemento_remunerativo',
     'ajuste_apross':             'ajuste_apross',
     'descuento_apross_familiar': 'descuento_apross_familiar',
+    'pct_jub_ley11087':          'pct_jub_ley11087',
 }
 
 # Mapeo: clave interna → nombre para mostrar en columnas
@@ -32,6 +33,7 @@ DISPLAY_NAMES = {
     'complemento_remunerativo':  'Complemento Remunerativo',
     'ajuste_apross':             'Ajuste Dif. Aporte Mínimo APROSS',
     'descuento_apross_familiar': 'Descuento APROSS por afiliados Familiares Voluntar',
+    'pct_jub_ley11087':          '% Aporte Jub. Ley 11.087',
 }
 
 
@@ -57,6 +59,8 @@ class DataProcessor:
             'complemento_remunerativo': 0.0,
             'ajuste_apross': 0.0,
             'descuento_apross_familiar': 0.0,
+            '_aporte_jub_total': 0.0,       # numerador para promedio ponderado
+            '_rem_jub_total': 0.0,           # denominador para promedio ponderado
         })
         
         for b in blocks:
@@ -66,13 +70,31 @@ class DataProcessor:
             accum[name]['complemento_remunerativo'] += b.complemento_remunerativo
             accum[name]['ajuste_apross'] += b.ajuste_apross
             accum[name]['descuento_apross_familiar'] += b.descuento_apross_familiar
+            
+            # Para el porcentaje: acumulamos monto y base para promedio ponderado
+            if b.aporte_jub_ley11087 > 0 and b.rem_con_aporte > 0:
+                accum[name]['_aporte_jub_total'] += b.aporte_jub_ley11087
+                accum[name]['_rem_jub_total'] += b.rem_con_aporte
         
         names = sorted(accum.keys()) if sort_alpha else list(accum.keys())
         
         result = []
         for name in names:
             row = {'nombre': name}
-            row.update(accum[name])
+            row['rem_con_aporte'] = accum[name]['rem_con_aporte']
+            row['liquido'] = accum[name]['liquido']
+            row['complemento_remunerativo'] = accum[name]['complemento_remunerativo']
+            row['ajuste_apross'] = accum[name]['ajuste_apross']
+            row['descuento_apross_familiar'] = accum[name]['descuento_apross_familiar']
+            
+            # Porcentaje: promedio ponderado por remunerativo
+            rem_total = accum[name]['_rem_jub_total']
+            aporte_total = accum[name]['_aporte_jub_total']
+            if rem_total > 0:
+                row['pct_jub_ley11087'] = round((aporte_total / rem_total) * 100)
+            else:
+                row['pct_jub_ley11087'] = 0
+            
             result.append(row)
         
         logger.info(f"Consolidados {len(blocks)} bloques → {len(result)} empleados")
@@ -112,9 +134,14 @@ class DataProcessor:
         return df
     
     def calculate_totals(self, df: pd.DataFrame) -> Dict[str, float]:
-        """Calcula totales de columnas numéricas."""
+        """Calcula totales de columnas numéricas (excluye porcentajes)."""
+        pct_col = DISPLAY_NAMES.get('pct_jub_ley11087', '')
         totals = {}
         for col in df.columns:
-            if col != 'Apellido y Nombre' and pd.api.types.is_numeric_dtype(df[col]):
+            if col == 'Apellido y Nombre':
+                continue
+            if col == pct_col:
+                continue  # No sumar porcentajes — no tiene sentido
+            if pd.api.types.is_numeric_dtype(df[col]):
                 totals[col] = df[col].sum()
         return totals

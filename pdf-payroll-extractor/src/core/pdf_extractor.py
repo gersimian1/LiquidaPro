@@ -47,6 +47,8 @@ class RawEmployeeBlock:
     complemento_remunerativo: float = 0.0
     ajuste_apross: float = 0.0
     descuento_apross_familiar: float = 0.0
+    aporte_jub_ley11087: float = 0.0       # RT 661060 — monto
+    pct_jub_ley11087: float = 0.0          # RT 661060 / Rem c/ Aporte * 100
 
 
 # ═══════════════════════════════════════════════════════════
@@ -102,6 +104,9 @@ class PDFExtractor:
     )
     RE_DESC_APROSS = re.compile(
         r'Descuento APROSS.*?Voluntar\s+([\d.]+,\d{2})'
+    )
+    RE_APORTE_JUB = re.compile(
+        r'RT\s+661060\s+.+?\s+([\d.]+,\d{2})'
     )
     
     # Líneas de concepto genérico
@@ -278,6 +283,8 @@ class PDFExtractor:
             cols['ajuste_apross'] = 'Ajuste Dif. Aporte Mínimo APROSS'
         if any(b.descuento_apross_familiar > 0 for b in self._blocks):
             cols['descuento_apross_familiar'] = 'Descuento APROSS por afiliados Familiares Voluntar'
+        if any(b.aporte_jub_ley11087 > 0 for b in self._blocks):
+            cols['pct_jub_ley11087'] = '% Aporte Jub. Ley 11.087'
         
         return cols
     
@@ -344,6 +351,15 @@ class PDFExtractor:
         
         m = self.RE_DESC_APROSS.search(raw)
         block.descuento_apross_familiar = self._parse_ar_number(m.group(1)) if m else 0.0
+        
+        m = self.RE_APORTE_JUB.search(raw)
+        block.aporte_jub_ley11087 = self._parse_ar_number(m.group(1)) if m else 0.0
+        
+        # Calcular porcentaje: RT 661060 / Rem c/ Aporte * 100
+        if block.rem_con_aporte > 0 and block.aporte_jub_ley11087 > 0:
+            block.pct_jub_ley11087 = round(
+                (block.aporte_jub_ley11087 / block.rem_con_aporte) * 100
+            )
         
         # Conceptos detallados (DV y RT)
         for m in self.RE_CONCEPTO_DV.finditer(raw):

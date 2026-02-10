@@ -18,6 +18,7 @@ Aplicación de escritorio que lee archivos de liquidación de haberes del sistem
 
 - **Detecta automáticamente** si el archivo es un PDF real o texto plano con extensión `.pdf`
 - **Extrae** por empleado: Nombre, Rem c/ Aporte, Líquido, Complemento Remunerativo, Ajuste APROSS, Desc. APROSS Familiares
+- **Calcula** el % de Aporte Jubilatorio Ley 11.087 sobre el remunerativo de cada empleado
 - **Consolida** empleados con múltiples cargos/roles (suma automática)
 - **Exporta** a Excel con encabezados, formato numérico, fila de totales y columnas autoajustadas
 
@@ -96,15 +97,6 @@ Registros extraídos:    325
 Empleados únicos:        79
 Total Líquido:    $69.621.514,43 ✓ (coincide con total del archivo fuente)
 ```
-
-## Mejoras futuras
-
-- [ ] OCR para PDFs escaneados (Tesseract)
-- [ ] Selección de conceptos individuales (DV/RT)
-- [ ] Comparación entre liquidaciones de distintos meses
-- [ ] Búsqueda/filtro en la tabla de resultados
-- [ ] Gráficos de distribución salarial
-- [ ] Empaquetado como `.exe` con PyInstaller
 
 ## Licencia
 

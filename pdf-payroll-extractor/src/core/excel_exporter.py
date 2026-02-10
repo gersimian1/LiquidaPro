@@ -66,6 +66,9 @@ class ExcelExporter:
                     # Alinear nombres a la izquierda, números a la derecha
                     if column == 'Apellido y Nombre':
                         cell.alignment = Alignment(horizontal='left')
+                    elif column == '% Aporte Jub. Ley 11.087':
+                        cell.alignment = Alignment(horizontal='right')
+                        cell.number_format = '0"%"'
                     else:
                         cell.alignment = Alignment(horizontal='right')
                         # Formato de número con separador de miles

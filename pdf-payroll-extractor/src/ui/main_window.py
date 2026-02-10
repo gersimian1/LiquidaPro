@@ -382,6 +382,7 @@ class MainWindow(QMainWindow):
             ('complemento_remunerativo', 'Complemento Remunerativo'),
             ('ajuste_apross', 'Ajuste Dif. Aporte Mínimo APROSS'),
             ('descuento_apross_familiar', 'Desc. APROSS Familiares Voluntarios'),
+            ('pct_jub_ley11087', '% Aporte Jub. Ley 11.087'),
         ]:
             chk = QCheckBox(f"  {display}")
             chk.setChecked(False)
@@ -758,6 +759,14 @@ class MainWindow(QMainWindow):
                     item = QTableWidgetItem(str(val))
                     item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
                     item.setForeground(QColor(T.FG))
+                elif key == 'pct_jub_ley11087':
+                    # Porcentaje: mostrar como entero con %
+                    if isinstance(val, (int, float)) and val > 0:
+                        item = QTableWidgetItem(f"{int(round(val))} %")
+                    else:
+                        item = QTableWidgetItem("—")
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                    item.setForeground(QColor(T.WARN))
                 else:
                     # Formato argentino
                     if isinstance(val, (int, float)) and val > 0:
@@ -788,7 +797,7 @@ class MainWindow(QMainWindow):
         
         # Orden fijo para consistencia
         order = ['rem_con_aporte', 'liquido', 'complemento_remunerativo',
-                 'ajuste_apross', 'descuento_apross_familiar']
+                 'ajuste_apross', 'descuento_apross_familiar', 'pct_jub_ley11087']
         
         for k in order:
             chk = self.col_checks.get(k)
