@@ -6,7 +6,7 @@ Aplicación de escritorio que lee archivos de liquidación de haberes del sistem
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![PySide6](https://img.shields.io/badge/UI-PySide6-41cd52?logo=qt&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-green)
+![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey)
 
 ---
 
@@ -21,9 +21,9 @@ Aplicación de escritorio que lee archivos de liquidación de haberes del sistem
 - **Consolida** empleados con múltiples cargos/roles (suma automática)
 - **Exporta** a Excel con encabezados, formato numérico, fila de totales y columnas autoajustadas
 
-## Capturas
+## Captura
 
-> *(Agregá screenshots de tu app acá — se ven en el repo de GitHub)*
+<img width="1918" height="1035" alt="Captura de pantalla 2026-02-10 191404" src="https://github.com/user-attachments/assets/bfcc2467-6319-4499-b5b8-b7a613d37a5f" />
 
 ## Arquitectura
 
@@ -70,7 +70,7 @@ tests/
 
 ```bash
 # 1. Clonar
-git clone https://github.com/TU-USUARIO/liquidapro.git
+git clone https://github.com/GermanSimian/liquidapro.git
 cd liquidapro
 
 # 2. Instalar dependencias
@@ -108,4 +108,6 @@ Total Líquido:    $69.621.514,43 ✓ (coincide con total del archivo fuente)
 
 ## Licencia
 
-MIT — ver [LICENSE](LICENSE)
+CC BY-NC 4.0 — ver [LICENSE](LICENSE)
+
+Este proyecto no puede ser utilizado con fines comerciales.
