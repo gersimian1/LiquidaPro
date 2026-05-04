@@ -69,7 +69,8 @@ class T:
 #  THREAD DE PROCESAMIENTO
 # ═══════════════════════════════════════════════════════════
 class ProcessThread(QThread):
-    finished = Signal(list)
+    # emite {path: List[RawEmployeeBlock]} — un entry por archivo
+    finished = Signal(object)
     error    = Signal(str)
     progress = Signal(int, str)
 
@@ -78,7 +79,7 @@ class ProcessThread(QThread):
         self.file_paths = file_paths
 
     def run(self):
-        all_blocks = []
+        results: Dict[str, list] = {}
         total = len(self.file_paths)
         try:
             for idx, path in enumerate(self.file_paths):
@@ -94,9 +95,10 @@ class ProcessThread(QThread):
                     f"Extrayendo datos de {name}..."
                 )
                 blocks = extractor.extract_blocks()
-                all_blocks.extend(blocks)
-            self.progress.emit(90, f"Extracción completa: {len(all_blocks)} registros")
-            self.finished.emit(all_blocks)
+                results[path] = blocks
+            total_blocks = sum(len(b) for b in results.values())
+            self.progress.emit(90, f"Extracción completa: {total_blocks} registros")
+            self.finished.emit(results)
         except Exception as e:
             self.error.emit(str(e))
 
@@ -141,9 +143,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("LiquidaPro — Extractor de Recibos de Sueldo")
         self.setMinimumSize(1100, 680)
 
-        self.file_paths:   List[str]             = []
-        self.raw_blocks:   List[RawEmployeeBlock] = []
-        self.consolidated: List[Dict]            = []
+        self.file_paths:          List[str]             = []
+        self.raw_blocks_per_file: Dict[str, list]      = {}  # path → blocks
+        self.results_per_file:    Dict[str, List[Dict]] = {}  # path → consolidated
+        self.current_path:        Optional[str]         = None
         self.is_processed = False
         self.col_checks:   Dict[str, QPushButton] = {}
 
@@ -303,6 +306,7 @@ class MainWindow(QMainWindow):
             QListWidget::item:hover {{ background: {T.BG_HOVER}; }}
         """)
         self._show_file_placeholder()
+        self.file_list.currentRowChanged.connect(self._on_file_row_changed)
         lay.addWidget(self.file_list)
         return w
 
@@ -467,6 +471,12 @@ class MainWindow(QMainWindow):
         self.btn_excel.setEnabled(False)
         lay.addWidget(self.btn_excel)
 
+        self.btn_export_all = self._outline_btn("Exportar Todos")
+        self.btn_export_all.setToolTip("Exporta cada archivo como un .xlsx separado en una carpeta")
+        self.btn_export_all.clicked.connect(self._on_export_all)
+        self.btn_export_all.setEnabled(False)
+        lay.addWidget(self.btn_export_all)
+
         return tb
 
     def _make_table(self) -> QWidget:
@@ -567,6 +577,9 @@ class MainWindow(QMainWindow):
     def _add_files(self, paths: List[str]):
         self.file_paths = paths
         self.is_processed = False
+        self.results_per_file = {}
+        self.raw_blocks_per_file = {}
+        self.current_path = None
 
         self.file_list.clear()
         for p in paths:
@@ -577,6 +590,7 @@ class MainWindow(QMainWindow):
         self.btn_process.setEnabled(True)
         self.btn_excel.setEnabled(False)
         self.btn_csv.setEnabled(False)
+        self.btn_export_all.setEnabled(False)
         self._reset_table_placeholder()
         self.lbl_records.setText("")
         self.lbl_status.setText("")
@@ -591,6 +605,7 @@ class MainWindow(QMainWindow):
         self.btn_load_multi.setEnabled(False)
         self.btn_excel.setEnabled(False)
         self.btn_csv.setEnabled(False)
+        self.btn_export_all.setEnabled(False)
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self._set_badge("warn", "Procesando...")
@@ -606,19 +621,23 @@ class MainWindow(QMainWindow):
         self.progress.setValue(value)
         self.lbl_progress_msg.setText(msg)
 
-    def _on_finished(self, blocks: List[RawEmployeeBlock]):
-        self.raw_blocks = blocks
+    def _on_finished(self, results: dict):
         sort_alpha = self.radio_alpha.isChecked()
-        self.consolidated = self.processor.consolidate(blocks, sort_alpha)
+        self.raw_blocks_per_file = results
+        self.results_per_file = {
+            path: self.processor.consolidate(blocks, sort_alpha)
+            for path, blocks in results.items()
+        }
         self.is_processed = True
 
-        n_blocks = len(blocks)
-        n_emp    = len(self.consolidated)
+        n_files   = len(results)
+        n_blocks  = sum(len(b) for b in results.values())
+        n_emp_total = sum(len(v) for v in self.results_per_file.values())
 
         self.progress.setValue(100)
-        self._set_badge("ok", f"✓  {n_emp} empleados · {n_blocks} registros")
+        self._set_badge("ok", f"✓  {n_files} archivo{'s' if n_files != 1 else ''} · {n_emp_total} empleados · {n_blocks} registros")
         self.lbl_progress_msg.setText("")
-        self.lbl_status.setText(f"Listo — {n_emp} empleados únicos consolidados de {len(self.file_paths)} archivo(s)")
+        self.lbl_status.setText(f"Listo — seleccioná un archivo en la lista para ver sus datos")
         self.lbl_status.setStyleSheet(f"color: {T.OK}; font: 11px {T.F}; background: transparent; border: none;")
 
         self.btn_process.setEnabled(True)
@@ -626,8 +645,12 @@ class MainWindow(QMainWindow):
         self.btn_load_multi.setEnabled(True)
         self.btn_excel.setEnabled(True)
         self.btn_csv.setEnabled(True)
+        self.btn_export_all.setEnabled(n_files > 1)
 
-        self._fill_table()
+        # Seleccionar el primer archivo automáticamente
+        if self.file_paths:
+            self.file_list.setCurrentRow(0)
+
         QTimer.singleShot(2200, lambda: self.progress.setVisible(False))
 
     def _on_error(self, msg: str):
@@ -646,20 +669,36 @@ class MainWindow(QMainWindow):
         if self.is_processed:
             self._fill_table()
 
+    def _on_file_row_changed(self, row: int):
+        """Cambiar archivo seleccionado en la lista → actualizar tabla."""
+        if not self.is_processed or row < 0 or row >= len(self.file_paths):
+            return
+        self.current_path = self.file_paths[row]
+        name = Path(self.current_path).name
+        consolidated = self.results_per_file.get(self.current_path, [])
+        n = len(consolidated)
+        self._set_badge("ok", f"✓  {name}  —  {n} empleados")
+        self.lbl_records.setText(f"{n} empleados")
+        self.lbl_status.setText(f"{self.current_path}")
+        self._fill_table()
+
     def _on_sort_changed(self):
-        if not self.is_processed or not self.raw_blocks:
+        if not self.is_processed or not self.raw_blocks_per_file:
             return
         sort_alpha = self.radio_alpha.isChecked()
-        self.consolidated = self.processor.consolidate(self.raw_blocks, sort_alpha)
+        # Re-consolidar todos los archivos con el nuevo orden
+        self.results_per_file = {
+            path: self.processor.consolidate(blocks, sort_alpha)
+            for path, blocks in self.raw_blocks_per_file.items()
+        }
         self._fill_table()
-        order = "alfabético" if sort_alpha else "original del PDF"
-        self._set_badge("ok", f"✓  {len(self.consolidated)} empleados · Orden {order}")
 
     def _on_clear(self):
-        self.file_paths    = []
-        self.raw_blocks    = []
-        self.consolidated  = []
-        self.is_processed  = False
+        self.file_paths           = []
+        self.raw_blocks_per_file  = {}
+        self.results_per_file     = {}
+        self.current_path         = None
+        self.is_processed         = False
 
         self.file_list.clear()
         self._show_file_placeholder()
@@ -672,6 +711,7 @@ class MainWindow(QMainWindow):
         self.btn_process.setEnabled(False)
         self.btn_excel.setEnabled(False)
         self.btn_csv.setEnabled(False)
+        self.btn_export_all.setEnabled(False)
 
     # ══════════════════════════════════════════════════════
     #  TABLA
@@ -687,7 +727,8 @@ class MainWindow(QMainWindow):
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
 
     def _fill_table(self):
-        if not self.consolidated:
+        consolidated = self.results_per_file.get(self.current_path, []) if self.current_path else []
+        if not consolidated:
             return
 
         keys         = self._get_selected_keys()
@@ -695,13 +736,13 @@ class MainWindow(QMainWindow):
 
         self.table.setColumnCount(len(display_cols))
         self.table.setHorizontalHeaderLabels(display_cols)
-        self.table.setRowCount(len(self.consolidated))
+        self.table.setRowCount(len(consolidated))
 
         mono = QFont()
         mono.setFamilies(["Cascadia Code", "JetBrains Mono", "Consolas"])
         mono.setPointSize(11)
 
-        for ri, rec in enumerate(self.consolidated):
+        for ri, rec in enumerate(consolidated):
             for ci, key in enumerate(keys):
                 val = rec.get(key, 0.0)
 
@@ -732,7 +773,7 @@ class MainWindow(QMainWindow):
         for i in range(1, len(keys)):
             hdr.setSectionResizeMode(i, QHeaderView.ResizeToContents)
 
-        self.lbl_records.setText(f"{len(self.consolidated)} empleados")
+        self.lbl_records.setText(f"{len(consolidated)} empleados")
 
     def _get_selected_keys(self) -> List[str]:
         order = [k for k, *_ in self.COLUMNS]
@@ -741,19 +782,23 @@ class MainWindow(QMainWindow):
     # ══════════════════════════════════════════════════════
     #  EXPORTACIÓN
     # ══════════════════════════════════════════════════════
+    def _current_consolidated(self) -> List[Dict]:
+        return self.results_per_file.get(self.current_path, []) if self.current_path else []
+
     def _on_export_excel(self):
-        if not self.is_processed:
+        if not self.is_processed or not self.current_path:
             return
+        stem = Path(self.current_path).stem
         path, _ = QFileDialog.getSaveFileName(
-            self, "Guardar Excel", "liquidaciones.xlsx", "Excel (*.xlsx)"
+            self, "Guardar Excel", f"{stem}.xlsx", "Excel (*.xlsx)"
         )
         if not path:
             return
         try:
             keys   = self._get_selected_keys()
-            df     = self.processor.to_dataframe(self.consolidated, keys)
+            df     = self.processor.to_dataframe(self._current_consolidated(), keys)
             totals = self.processor.calculate_totals(df)
-            self.exporter.export_to_excel(df, path, totals)
+            self.exporter.export_to_excel(df, path, totals, title=stem)
             self._set_badge("ok", f"✓  Exportado: {Path(path).name}")
             self.lbl_status.setText(f"Excel guardado — {path}")
         except Exception as e:
@@ -761,22 +806,59 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error al exportar", str(e))
 
     def _on_export_csv(self):
-        if not self.is_processed:
+        if not self.is_processed or not self.current_path:
             return
+        stem = Path(self.current_path).stem
         path, _ = QFileDialog.getSaveFileName(
-            self, "Guardar CSV", "liquidaciones.csv", "CSV (*.csv)"
+            self, "Guardar CSV", f"{stem}.csv", "CSV (*.csv)"
         )
         if not path:
             return
         try:
             keys = self._get_selected_keys()
-            df   = self.processor.to_dataframe(self.consolidated, keys)
+            df   = self.processor.to_dataframe(self._current_consolidated(), keys)
             self.exporter.export_to_csv(df, path)
             self._set_badge("ok", f"✓  Exportado: {Path(path).name}")
             self.lbl_status.setText(f"CSV guardado — {path}")
         except Exception as e:
             logger.error(f"Error CSV: {e}")
             QMessageBox.critical(self, "Error al exportar", str(e))
+
+    def _on_export_all(self):
+        """Exporta cada archivo como un .xlsx separado en una carpeta elegida."""
+        if not self.is_processed or not self.results_per_file:
+            return
+        folder = QFileDialog.getExistingDirectory(self, "Elegir carpeta de destino")
+        if not folder:
+            return
+
+        keys = self._get_selected_keys()
+        errors = []
+        exported = 0
+
+        for src_path, consolidated in self.results_per_file.items():
+            stem = Path(src_path).stem
+            dest = str(Path(folder) / f"{stem}.xlsx")
+            try:
+                df     = self.processor.to_dataframe(consolidated, keys)
+                totals = self.processor.calculate_totals(df)
+                self.exporter.export_to_excel(df, dest, totals, title=stem)
+                exported += 1
+            except Exception as e:
+                errors.append(f"{stem}: {e}")
+
+        if errors:
+            QMessageBox.warning(
+                self, "Exportación parcial",
+                f"Se exportaron {exported} de {len(self.results_per_file)} archivos.\n\nErrores:\n" + "\n".join(errors)
+            )
+        else:
+            self._set_badge("ok", f"✓  {exported} archivos exportados")
+            self.lbl_status.setText(f"Todos los archivos exportados en {folder}")
+            QMessageBox.information(
+                self, "Exportación completa",
+                f"Se exportaron {exported} archivo(s) en:\n{folder}"
+            )
 
     # ══════════════════════════════════════════════════════
     #  BADGE
