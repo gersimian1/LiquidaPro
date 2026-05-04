@@ -371,13 +371,19 @@ class MainWindow(QMainWindow):
         chk_l.toggled.connect(lambda checked: self.col_checks['rem_con_aporte'].setChecked(checked))
         self.col_checks['liquido'] = chk_l
         c2.addWidget(chk_l)
+
+        chk_rsa = QCheckBox("  Total Retroactivos sin Aportes")
+        chk_rsa.setChecked(False)
+        chk_rsa.setStyleSheet(cs)
+        self.col_checks['retroactivos_sin_aporte'] = chk_rsa
+        c2.addWidget(chk_rsa)
         c2.addWidget(self._sep())
-        
+
         # Opcionales
         opt = QLabel("  Opcionales:")
         opt.setStyleSheet(f"color: {T.FG2}; font: 600 11px {T.F}; background: transparent; border: none;")
         c2.addWidget(opt)
-        
+
         for key, display in [
             ('complemento_remunerativo', 'Complemento Remunerativo'),
             ('ajuste_apross', 'Ajuste Dif. Aporte Mínimo APROSS'),
@@ -796,8 +802,9 @@ class MainWindow(QMainWindow):
         keys = ['nombre']  # Siempre
         
         # Orden fijo para consistencia
-        order = ['rem_con_aporte', 'liquido', 'complemento_remunerativo',
-                 'ajuste_apross', 'descuento_apross_familiar', 'pct_jub_ley11087']
+        order = ['rem_con_aporte', 'liquido', 'retroactivos_sin_aporte',
+                 'complemento_remunerativo', 'ajuste_apross',
+                 'descuento_apross_familiar', 'pct_jub_ley11087']
         
         for k in order:
             chk = self.col_checks.get(k)

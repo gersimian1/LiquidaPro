@@ -37,6 +37,7 @@ class RawEmployeeBlock:
     
     rem_con_aporte: float = 0.0
     rem_sin_aporte: float = 0.0
+    retroactivos_sin_aporte: float = 0.0
     liquido: float = 0.0
     
     # Conceptos individuales (DV = devengado, RT = retención)
@@ -107,6 +108,11 @@ class PDFExtractor:
     )
     RE_APORTE_JUB = re.compile(
         r'RT\s+661060\s+.+?\s+([\d.]+,\d{2})'
+    )
+    # Funciona para pdfplumber (línea única: "DV 113300 ... 201701,84")
+    # y para texto crudo (multi-línea: "113300 ...\n201701,84\nDV")
+    RE_RETROACTIVOS_SIN_APORTE = re.compile(
+        r'(?:DV\s+)?113300\s+Total Retroactivos sin Aportes\s+([\d.]+,\d{2})'
     )
     
     # Líneas de concepto genérico
@@ -346,6 +352,9 @@ class PDFExtractor:
         m = self.RE_COMPLEMENTO.search(raw)
         block.complemento_remunerativo = self._parse_ar_number(m.group(1)) if m else 0.0
         
+        m = self.RE_RETROACTIVOS_SIN_APORTE.search(raw)
+        block.retroactivos_sin_aporte = self._parse_ar_number(m.group(1)) if m else 0.0
+
         m = self.RE_AJUSTE_APROSS.search(raw)
         block.ajuste_apross = self._parse_ar_number(m.group(1)) if m else 0.0
         
