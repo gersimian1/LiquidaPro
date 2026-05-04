@@ -1,22 +1,14 @@
 """
-══════════════════════════════════════════════════════════════
-  LiquidaPro — Ventana Principal v2
-  
-  Flujo correcto:
-  1. Cargar archivo(s) → aparecen en lista + preview de texto
-  2. Configurar columnas y orden
-  3. Presionar PROCESAR → extrae, consolida, muestra en tabla
-  4. Exportar a Excel / CSV
-══════════════════════════════════════════════════════════════
+LiquidaPro — Ventana Principal v3
+Rediseño: sidebar fija + tabla completa
 """
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QListWidget, QLabel, QCheckBox, QFileDialog,
-    QMessageBox, QProgressBar, QSplitter, QRadioButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QFrame,
-    QScrollArea, QAbstractItemView, QListWidgetItem,
-    QTextEdit, QSizePolicy, QButtonGroup
+    QListWidget, QLabel, QFileDialog, QMessageBox, QProgressBar,
+    QRadioButton, QTableWidget, QTableWidgetItem, QHeaderView,
+    QFrame, QAbstractItemView, QListWidgetItem, QButtonGroup,
+    QScrollArea
 )
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QColor, QFont
@@ -32,58 +24,62 @@ logger = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════
-#  TEMA
+#  TEMA — Claro, profesional, herramienta financiera/contable
 # ═══════════════════════════════════════════════════════════
 class T:
-    """Paleta de colores y fuentes. Cambiar aquí afecta todo."""
-    
-    BG0 = "#0f0f1a"      # Más oscuro (header/footer)
-    BG1 = "#1a1a2e"      # Fondo principal
-    BG2 = "#222240"      # Tarjetas
-    BG3 = "#2a2a4a"      # Inputs / elevated
-    BGH = "#333360"      # Hover
-    BGA = "#1e1e38"      # Filas alternadas
-    
-    FG  = "#f0f0f5"      # Texto principal (ratio 12:1)
-    FG2 = "#b8b8d0"      # Texto secundario (7:1)
-    FGM = "#8888aa"      # Muted (4.5:1 AA)
-    FGD = "#505070"      # Disabled
-    
-    ACC = "#00d4aa"      # Accent
-    ACH = "#00e8bc"      # Accent hover
-    ACP = "#00b090"      # Accent pressed
-    
-    WARN = "#ffb347"
-    ERR  = "#ff6b6b"
-    OK   = "#51cf66"
-    INF  = "#74c0fc"
-    
-    BRD  = "#3a3a5c"     # Bordes
-    
-    F  = "'Segoe UI', 'SF Pro Display', 'Helvetica Neue', sans-serif"
-    FM = "'Cascadia Code', 'Fira Code', 'Consolas', monospace"
+    BG           = "#FFFFFF"
+    BG_SIDEBAR   = "#F5F5FA"
+    BG_HOVER     = "#EDEDF8"
+    BG_ACTIVE    = "#E6E6F5"
+    BG_ALT       = "#F9F9FC"
+    BG_HDR_ROW   = "#F2F2F8"
+
+    BORDER       = "#E0E0EC"
+    BORDER_MED   = "#C4C4D8"
+
+    TEXT         = "#18182C"
+    TEXT2        = "#46466A"
+    TEXT_MUTED   = "#8A8AAA"
+    TEXT_DIS     = "#BCBCD0"
+
+    ACCENT       = "#5046E4"
+    ACCENT_H     = "#3F35CC"
+    ACCENT_P     = "#3028B4"
+    ACCENT_LIGHT = "#ECEAFF"
+    ACCENT_DARK  = "#2E28A0"
+
+    OK           = "#15803D"
+    OK_BG        = "#F0FDF4"
+    OK_BRD       = "#86EFAC"
+    WARN         = "#B45309"
+    WARN_BG      = "#FFFBEB"
+    WARN_BRD     = "#FCD34D"
+    ERR          = "#DC2626"
+    ERR_BG       = "#FEF2F2"
+    ERR_BRD      = "#FCA5A5"
+    INF          = "#0369A1"
+    INF_BG       = "#F0F9FF"
+    INF_BRD      = "#7DD3FC"
+
+    F  = "'Segoe UI Variable', 'Segoe UI', -apple-system, 'Helvetica Neue', sans-serif"
+    FM = "'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace"
 
 
 # ═══════════════════════════════════════════════════════════
 #  THREAD DE PROCESAMIENTO
 # ═══════════════════════════════════════════════════════════
 class ProcessThread(QThread):
-    """
-    Thread que ejecuta: cargar archivos → extraer bloques.
-    La consolidación se hace después en el main thread (es rápida).
-    """
-    finished = Signal(list)          # Lista de RawEmployeeBlock
-    error = Signal(str)
-    progress = Signal(int, str)      # (porcentaje, mensaje)
-    
+    finished = Signal(list)
+    error    = Signal(str)
+    progress = Signal(int, str)
+
     def __init__(self, file_paths: List[str]):
         super().__init__()
         self.file_paths = file_paths
-    
+
     def run(self):
         all_blocks = []
         total = len(self.file_paths)
-        
         try:
             for idx, path in enumerate(self.file_paths):
                 name = Path(path).name
@@ -91,21 +87,16 @@ class ProcessThread(QThread):
                     int((idx / total) * 80),
                     f"Leyendo {name}  ({idx+1}/{total})..."
                 )
-                
                 extractor = PDFExtractor()
                 extractor.load_file(path)
-                
                 self.progress.emit(
                     int(((idx + 0.5) / total) * 80),
                     f"Extrayendo datos de {name}..."
                 )
-                
                 blocks = extractor.extract_blocks()
                 all_blocks.extend(blocks)
-            
             self.progress.emit(90, f"Extracción completa: {len(all_blocks)} registros")
             self.finished.emit(all_blocks)
-            
         except Exception as e:
             self.error.emit(str(e))
 
@@ -115,493 +106,448 @@ class ProcessThread(QThread):
 # ═══════════════════════════════════════════════════════════
 class MainWindow(QMainWindow):
     """
-    Flujo:
-    ┌─ PASO 1: Cargar ─────────────────────────────┐
-    │  [Cargar PDF]  [Cargar Múltiples]  [Limpiar]  │
-    │  Lista de archivos cargados                   │
-    ├─ PASO 2: Configurar ──────┬─ Preview ────────┤
-    │  ◉ Orden alfabético       │  Vista previa    │
-    │  ☑ Rem c/ Aporte          │  del texto del   │
-    │  ☑ Líquido                │  archivo         │
-    │  ☐ Complemento            │                  │
-    │                           │                  │
-    │  [████ PROCESAR ████]     │                  │
-    ├───────────────────────────┴──────────────────┤
-    │  PASO 3: Tabla de resultados                  │
-    ├──────────────────────────────────────────────┤
-    │  PASO 4:  [Exportar CSV]  [Exportar Excel]   │
-    └──────────────────────────────────────────────┘
+    Layout v3:
+    ┌──────────────┬─────────────────────────────────────┐
+    │  SIDEBAR     │  TOOLBAR (⚡ PROCESAR / CSV / Excel) │
+    │  ─────────   ├─────────────────────────────────────┤
+    │  Archivos    │                                     │
+    │  + botones   │         TABLA (ocupa todo)          │
+    │  lista       │                                     │
+    │  ─────────   │                                     │
+    │  Columnas    │                                     │
+    │  [toggle]    │                                     │
+    │  [toggle]    │                                     │
+    │  ...         │                                     │
+    │  ─────────   ├─────────────────────────────────────┤
+    │  Ordenar     │  STATUS BAR                         │
+    └──────────────┴─────────────────────────────────────┘
     """
-    
+
+    # Definición canónica de columnas
+    COLUMNS = [
+        ('nombre',                    'Apellido y Nombre',            True,  None),
+        ('rem_con_aporte',            'Rem c/ Aporte',                True,  'liquido'),
+        ('liquido',                   'Líquido',                      True,  'rem_con_aporte'),
+        ('retroactivos_sin_aporte',   'Retroactivos s/ Aportes',      False, None),
+        ('retroactivos_con_aporte',   'Retroactivos c/ Aportes',      False, None),
+        ('complemento_remunerativo',  'Complemento Remunerativo',     False, None),
+        ('ajuste_apross',             'Ajuste APROSS',                False, None),
+        ('descuento_apross_familiar', 'Desc. APROSS Fam.',            False, None),
+        ('pct_jub_ley11087',          '% Jub. Ley 11.087',           False, None),
+    ]
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("LiquidaPro — Extractor de Recibos de Sueldo")
-        self.setMinimumSize(1280, 860)
-        
-        # ── Estado ──
-        self.file_paths: List[str] = []
-        self.raw_blocks: List[RawEmployeeBlock] = []
-        self.consolidated: List[Dict] = []
+        self.setMinimumSize(1100, 680)
+
+        self.file_paths:   List[str]             = []
+        self.raw_blocks:   List[RawEmployeeBlock] = []
+        self.consolidated: List[Dict]            = []
         self.is_processed = False
-        
-        # ── Core ──
+        self.col_checks:   Dict[str, QPushButton] = {}
+
         self.processor = DataProcessor()
-        self.exporter = ExcelExporter()
-        
+        self.exporter  = ExcelExporter()
+
         self._build_ui()
-        self._apply_styles()
-    
-    # ═══════════════════════════════════════════════
-    #  CONSTRUCCIÓN DE UI
-    # ═══════════════════════════════════════════════
+        self._apply_global_style()
+
+    # ══════════════════════════════════════════════════════
+    #  BUILD
+    # ══════════════════════════════════════════════════════
     def _build_ui(self):
-        central = QWidget()
-        self.setCentralWidget(central)
-        root = QVBoxLayout(central)
-        root.setSpacing(0)
-        root.setContentsMargins(0, 0, 0, 0)
-        
-        # Header
-        root.addWidget(self._make_header())
-        
-        # Contenido
-        body = QWidget()
-        body_lay = QVBoxLayout(body)
-        body_lay.setSpacing(16)
-        body_lay.setContentsMargins(24, 20, 24, 20)
-        
-        # PASO 1: Carga
-        body_lay.addWidget(self._make_step_label("PASO 1", "Cargar archivo(s) de liquidación"))
-        body_lay.addWidget(self._make_file_section())
-        
-        # PASO 2: Config + Preview en splitter
-        body_lay.addWidget(self._make_step_label("PASO 2", "Configurar extracción y procesar"))
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.setHandleWidth(2)
-        splitter.setStyleSheet(f"QSplitter::handle {{ background: {T.BRD}; margin: 0 8px; }}")
-        splitter.addWidget(self._make_config_panel())
-        splitter.addWidget(self._make_preview_panel())
-        splitter.setSizes([480, 660])
-        body_lay.addWidget(splitter, stretch=1)
-        
-        # PASO 3: Tabla
-        body_lay.addWidget(self._make_step_label("PASO 3", "Revisar datos extraídos"))
-        body_lay.addWidget(self._make_data_table(), stretch=2)
-        
-        root.addWidget(body, stretch=1)
-        
-        # Footer
-        root.addWidget(self._make_footer())
-    
-    # ─── HEADER ───────────────────────────────
-    def _make_header(self) -> QWidget:
-        w = QWidget()
-        w.setFixedHeight(70)
-        w.setStyleSheet(f"""
-            QWidget {{ background: {T.BG0}; border-bottom: 1px solid {T.BRD}; }}
+        root = QWidget()
+        self.setCentralWidget(root)
+        lay = QHBoxLayout(root)
+        lay.setSpacing(0)
+        lay.setContentsMargins(0, 0, 0, 0)
+
+        lay.addWidget(self._make_sidebar())
+        lay.addWidget(self._make_main_area(), stretch=1)
+
+    # ══════════════════════════════════════════════════════
+    #  SIDEBAR
+    # ══════════════════════════════════════════════════════
+    def _make_sidebar(self) -> QWidget:
+        sb = QWidget()
+        sb.setFixedWidth(288)
+        sb.setStyleSheet(f"""
+            QWidget {{
+                background: {T.BG_SIDEBAR};
+                border-right: 1px solid {T.BORDER};
+            }}
         """)
+        lay = QVBoxLayout(sb)
+        lay.setSpacing(0)
+        lay.setContentsMargins(0, 0, 0, 0)
+
+        # Brand
+        lay.addWidget(self._make_brand())
+
+        # Contenido scrollable
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical {
+                background: transparent; width: 4px; border-radius: 2px;
+            }
+            QScrollBar::handle:vertical {
+                background: #C4C4D8; border-radius: 2px; min-height: 24px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+        """)
+
+        inner = QWidget()
+        inner.setStyleSheet("QWidget { background: transparent; border: none; }")
+        il = QVBoxLayout(inner)
+        il.setSpacing(0)
+        il.setContentsMargins(0, 0, 0, 0)
+
+        il.addWidget(self._section_label("ARCHIVOS"))
+        il.addWidget(self._make_file_section())
+        il.addWidget(self._hdivider())
+
+        il.addWidget(self._section_label("COLUMNAS A EXPORTAR"))
+        il.addWidget(self._make_column_toggles())
+        il.addWidget(self._hdivider())
+
+        il.addWidget(self._section_label("ORDENAR POR"))
+        il.addWidget(self._make_sort_section())
+        il.addStretch()
+
+        scroll.setWidget(inner)
+        lay.addWidget(scroll, stretch=1)
+        return sb
+
+    def _make_brand(self) -> QWidget:
+        w = QWidget()
+        w.setFixedHeight(60)
+        w.setStyleSheet(f"background: {T.BG_SIDEBAR}; border-bottom: 1px solid {T.BORDER};")
         lay = QHBoxLayout(w)
-        lay.setContentsMargins(28, 0, 28, 0)
-        
+        lay.setContentsMargins(20, 0, 20, 0)
+
         col = QVBoxLayout()
-        col.setSpacing(2)
+        col.setSpacing(1)
         t = QLabel("LiquidaPro")
-        t.setStyleSheet(f"color: {T.ACC}; font: 800 22px {T.F}; letter-spacing: 1px;")
-        s = QLabel("Extractor de Recibos de Sueldo  ·  PDF → Excel")
-        s.setStyleSheet(f"color: {T.FGM}; font: 12px {T.F}; letter-spacing: 0.8px;")
+        t.setStyleSheet(f"""
+            color: {T.ACCENT};
+            font: 700 17px {T.F};
+            letter-spacing: -0.3px;
+            background: transparent; border: none;
+        """)
+        s = QLabel("Extractor de recibos de sueldo")
+        s.setStyleSheet(f"color: {T.TEXT_MUTED}; font: 11px {T.F}; background: transparent; border: none;")
         col.addWidget(t)
         col.addWidget(s)
         lay.addLayout(col)
         lay.addStretch()
-        
-        self.badge = QLabel("  Sin archivos cargados")
-        self._set_badge("info", "Sin archivos cargados")
-        lay.addWidget(self.badge)
-        
         return w
-    
-    def _set_badge(self, level: str, text: str):
-        colors = {
-            "info": (T.INF, "#1a2a40"), "ok": (T.OK, "#1a3020"),
-            "warn": (T.WARN, "#3a2a10"), "err": (T.ERR, "#3a1a1a"),
-        }
-        fg, bg = colors.get(level, colors["info"])
-        self.badge.setText(f"  {text}")
-        self.badge.setStyleSheet(f"""
-            color: {fg}; font: 600 12px {T.F};
-            padding: 6px 14px; border-radius: 12px;
-            background: {bg}; border: 1px solid {fg}40;
-        """)
-    
-    def _make_step_label(self, step: str, desc: str) -> QLabel:
-        lbl = QLabel(f"  {step}  ›  {desc}")
+
+    def _section_label(self, text: str) -> QLabel:
+        lbl = QLabel(text)
         lbl.setStyleSheet(f"""
-            color: {T.FG}; font: 700 14px {T.F};
-            padding: 4px 0;
+            color: {T.TEXT_MUTED};
+            font: 700 10px {T.F};
+            letter-spacing: 0.9px;
+            padding: 14px 20px 6px 20px;
+            background: transparent; border: none;
         """)
         return lbl
-    
-    # ─── PASO 1: ARCHIVOS ─────────────────────
+
     def _make_file_section(self) -> QWidget:
         w = QWidget()
+        w.setStyleSheet("background: transparent; border: none;")
         lay = QVBoxLayout(w)
-        lay.setSpacing(8)
-        lay.setContentsMargins(0, 0, 0, 0)
-        
+        lay.setSpacing(6)
+        lay.setContentsMargins(16, 4, 16, 14)
+
         row = QHBoxLayout()
-        row.setSpacing(10)
-        
-        self.btn_load = self._accent_btn("📄  Cargar Archivo")
+        row.setSpacing(6)
+        self.btn_load = self._ghost_btn("+ Archivo")
         self.btn_load.clicked.connect(self._on_load_single)
         row.addWidget(self.btn_load)
-        
-        self.btn_load_multi = self._secondary_btn("📁  Cargar Múltiples")
+
+        self.btn_load_multi = self._ghost_btn("+ Múltiples")
         self.btn_load_multi.clicked.connect(self._on_load_multiple)
         row.addWidget(self.btn_load_multi)
-        
-        self.btn_clear = self._danger_btn("🗑  Limpiar Todo")
+
+        self.btn_clear = self._ghost_btn_danger("Limpiar")
         self.btn_clear.clicked.connect(self._on_clear)
         row.addWidget(self.btn_clear)
-        
-        row.addStretch()
-        
-        self.lbl_file_count = QLabel("0 archivos")
-        self.lbl_file_count.setStyleSheet(f"color: {T.FGM}; font: 12px {T.FM};")
-        row.addWidget(self.lbl_file_count)
-        
         lay.addLayout(row)
-        
+
         self.file_list = QListWidget()
-        self.file_list.setMaximumHeight(140)
+        self.file_list.setMaximumHeight(108)
         self.file_list.setStyleSheet(f"""
             QListWidget {{
-                background: {T.BG3}; color: {T.FG};
-                border: 1px solid {T.BRD}; border-radius: 8px;
-                padding: 4px; font: 12px {T.FM}; outline: none;
+                background: {T.BG};
+                border: 1px solid {T.BORDER};
+                border-radius: 7px;
+                font: 11px {T.FM};
+                color: {T.TEXT2};
+                padding: 2px;
+                outline: none;
             }}
-            QListWidget::item {{ padding: 3px 8px; border-radius: 4px; color: {T.FG}; }}
-            QListWidget::item:selected {{ background: {T.ACC}30; color: {T.ACC}; }}
-            QListWidget::item:hover {{ background: {T.BGH}; }}
+            QListWidget::item {{
+                padding: 5px 8px;
+                border-radius: 4px;
+                color: {T.TEXT2};
+            }}
+            QListWidget::item:selected {{
+                background: {T.ACCENT_LIGHT};
+                color: {T.ACCENT};
+            }}
+            QListWidget::item:hover {{ background: {T.BG_HOVER}; }}
         """)
+        self._show_file_placeholder()
         lay.addWidget(self.file_list)
-        
         return w
-    
-    # ─── PASO 2: CONFIG ───────────────────────
-    def _make_config_panel(self) -> QWidget:
-        panel = QWidget()
-        lay = QVBoxLayout(panel)
-        lay.setSpacing(10)
-        lay.setContentsMargins(0, 0, 0, 0)
-        
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-        
-        inner = QWidget()
-        inner_lay = QVBoxLayout(inner)
-        inner_lay.setSpacing(12)
-        inner_lay.setContentsMargins(0, 0, 12, 0)
-        
-        # ── Card: Ordenamiento ──
-        card1 = self._card("↕  Ordenamiento")
-        c1 = card1.layout()
-        self.radio_original = QRadioButton("  Mantener orden original del PDF")
-        self.radio_alpha = QRadioButton("  Ordenar alfabéticamente (A → Z)")
+
+    def _show_file_placeholder(self):
+        item = QListWidgetItem("  Sin archivos cargados")
+        item.setForeground(QColor(T.TEXT_DIS))
+        self.file_list.addItem(item)
+
+    def _make_column_toggles(self) -> QWidget:
+        w = QWidget()
+        w.setStyleSheet("background: transparent; border: none;")
+        lay = QVBoxLayout(w)
+        lay.setSpacing(3)
+        lay.setContentsMargins(16, 4, 16, 14)
+
+        for key, label, default, linked in self.COLUMNS:
+            btn = QPushButton(f"  {label}")
+            btn.setCheckable(True)
+            btn.setChecked(default)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setMinimumHeight(34)
+            btn.setStyleSheet(self._col_toggle_style())
+
+            if key == 'nombre':
+                btn.setEnabled(False)
+
+            if linked:
+                btn.toggled.connect(
+                    lambda checked, lk=linked: (
+                        self.col_checks[lk].setChecked(checked)
+                        if lk in self.col_checks else None
+                    )
+                )
+
+            btn.toggled.connect(lambda _: self._on_column_changed())
+            self.col_checks[key] = btn
+            lay.addWidget(btn)
+
+        return w
+
+    def _make_sort_section(self) -> QWidget:
+        w = QWidget()
+        w.setStyleSheet("background: transparent; border: none;")
+        lay = QVBoxLayout(w)
+        lay.setSpacing(2)
+        lay.setContentsMargins(16, 4, 16, 14)
+
+        self.radio_alpha    = QRadioButton("  Alfabético  (A → Z)")
+        self.radio_original = QRadioButton("  Orden original del PDF")
         self.radio_alpha.setChecked(True)
-        
-        # QButtonGroup garantiza exclusividad dentro del scroll area
+
         self._sort_group = QButtonGroup(self)
-        self._sort_group.addButton(self.radio_original, 0)
-        self._sort_group.addButton(self.radio_alpha, 1)
+        self._sort_group.addButton(self.radio_alpha, 0)
+        self._sort_group.addButton(self.radio_original, 1)
         self._sort_group.buttonClicked.connect(self._on_sort_changed)
-        
-        for r in [self.radio_original, self.radio_alpha]:
-            r.setStyleSheet(self._radio_style())
-            c1.addWidget(r)
-        inner_lay.addWidget(card1)
-        
-        # ── Card: Columnas ──
-        card2 = self._card("☰  Columnas a Exportar")
-        c2 = card2.layout()
-        
-        # Info
-        info = QFrame()
-        info.setStyleSheet(f"background: {T.INF}15; border: 1px solid {T.INF}40; border-radius: 8px;")
-        il = QVBoxLayout(info)
-        il.setContentsMargins(12, 8, 12, 8)
-        il.setSpacing(3)
-        for txt in ["ℹ️  'Apellido y Nombre' siempre se incluye",
-                     "ℹ️  'Rem c/ Aporte' y 'Líquido' se vinculan"]:
-            lb = QLabel(txt)
-            lb.setStyleSheet(f"color: {T.INF}; font: 500 12px {T.F}; background: transparent; border: none;")
-            il.addWidget(lb)
-        c2.addWidget(info)
-        c2.addSpacing(4)
-        
-        # Checkboxes
-        self.col_checks: Dict[str, QCheckBox] = {}
-        cs = self._chk_style()
-        
-        # Obligatorio
-        chk_n = QCheckBox("  Apellido y Nombre")
-        chk_n.setChecked(True)
-        chk_n.setEnabled(False)
-        chk_n.setStyleSheet(cs)
-        self.col_checks['nombre'] = chk_n
-        c2.addWidget(chk_n)
-        c2.addWidget(self._sep())
-        
-        # Vinculados
-        lnk = QLabel("  ⛓  Vinculados:")
-        lnk.setStyleSheet(f"color: {T.WARN}; font: 600 11px {T.F}; background: transparent; border: none;")
-        c2.addWidget(lnk)
-        
-        chk_r = QCheckBox("  Rem c/ Aporte")
-        chk_r.setChecked(True)
-        chk_r.setStyleSheet(cs)
-        chk_r.toggled.connect(lambda checked: self.col_checks['liquido'].setChecked(checked))
-        chk_r.toggled.connect(lambda _: self._on_column_changed())
-        self.col_checks['rem_con_aporte'] = chk_r
-        c2.addWidget(chk_r)
 
-        chk_l = QCheckBox("  Líquido")
-        chk_l.setChecked(True)
-        chk_l.setStyleSheet(cs)
-        chk_l.toggled.connect(lambda checked: self.col_checks['rem_con_aporte'].setChecked(checked))
-        chk_l.toggled.connect(lambda _: self._on_column_changed())
-        self.col_checks['liquido'] = chk_l
-        c2.addWidget(chk_l)
+        rs = self._radio_style()
+        for r in [self.radio_alpha, self.radio_original]:
+            r.setStyleSheet(rs)
+            lay.addWidget(r)
+        return w
 
-        chk_rsa = QCheckBox("  Total Retroactivos sin Aportes")
-        chk_rsa.setChecked(False)
-        chk_rsa.setStyleSheet(cs)
-        chk_rsa.toggled.connect(lambda _: self._on_column_changed())
-        self.col_checks['retroactivos_sin_aporte'] = chk_rsa
-        c2.addWidget(chk_rsa)
+    # ══════════════════════════════════════════════════════
+    #  MAIN AREA
+    # ══════════════════════════════════════════════════════
+    def _make_main_area(self) -> QWidget:
+        area = QWidget()
+        area.setStyleSheet(f"background: {T.BG};")
+        lay = QVBoxLayout(area)
+        lay.setSpacing(0)
+        lay.setContentsMargins(0, 0, 0, 0)
 
-        chk_rca = QCheckBox("  Total Retroactivos con Aportes")
-        chk_rca.setChecked(False)
-        chk_rca.setStyleSheet(cs)
-        chk_rca.toggled.connect(lambda _: self._on_column_changed())
-        self.col_checks['retroactivos_con_aporte'] = chk_rca
-        c2.addWidget(chk_rca)
-        c2.addWidget(self._sep())
+        lay.addWidget(self._make_toolbar())
 
-        # Opcionales
-        opt = QLabel("  Opcionales:")
-        opt.setStyleSheet(f"color: {T.FG2}; font: 600 11px {T.F}; background: transparent; border: none;")
-        c2.addWidget(opt)
-
-        for key, display in [
-            ('complemento_remunerativo', 'Complemento Remunerativo'),
-            ('ajuste_apross', 'Ajuste Dif. Aporte Mínimo APROSS'),
-            ('descuento_apross_familiar', 'Desc. APROSS Familiares Voluntarios'),
-            ('pct_jub_ley11087', '% Aporte Jub. Ley 11.087'),
-        ]:
-            chk = QCheckBox(f"  {display}")
-            chk.setChecked(False)
-            chk.setStyleSheet(cs)
-            chk.toggled.connect(lambda _: self._on_column_changed())
-            self.col_checks[key] = chk
-            c2.addWidget(chk)
-        
-        inner_lay.addWidget(card2)
-        inner_lay.addStretch()
-
-        scroll.setWidget(inner)
-        lay.addWidget(scroll, stretch=1)
-
-        # ══════════════════════════════════════════
-        #  BOTÓN PROCESAR — siempre visible, fuera del scroll
-        # ══════════════════════════════════════════
-        lay.addSpacing(8)
-
-        self.btn_process = QPushButton("⚡  PROCESAR")
-        self.btn_process.setCursor(Qt.PointingHandCursor)
-        self.btn_process.setMinimumHeight(52)
-        self.btn_process.setEnabled(False)
-        self.btn_process.clicked.connect(self._on_process)
-        self.btn_process.setStyleSheet(f"""
-            QPushButton {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                    stop:0 {T.ACC}, stop:1 #00b8d4);
-                color: {T.BG0};
-                border: none;
-                padding: 14px 32px;
-                border-radius: 10px;
-                font: 800 16px {T.F};
-                letter-spacing: 1px;
-            }}
-            QPushButton:hover {{
-                background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                    stop:0 {T.ACH}, stop:1 #00d0e8);
-            }}
-            QPushButton:pressed {{
-                background: {T.ACP};
-            }}
-            QPushButton:disabled {{
-                background: {T.BG3};
-                color: {T.FGD};
-            }}
-        """)
-        lay.addWidget(self.btn_process)
-
-        # Progress
+        # Barra de progreso (3px, pegada al toolbar)
         self.progress = QProgressBar()
-        self.progress.setVisible(False)
-        self.progress.setFixedHeight(6)
+        self.progress.setFixedHeight(3)
         self.progress.setTextVisible(False)
+        self.progress.setVisible(False)
         self.progress.setStyleSheet(f"""
-            QProgressBar {{ background: {T.BG3}; border: none; border-radius: 3px; }}
+            QProgressBar {{ background: {T.BORDER}; border: none; }}
             QProgressBar::chunk {{
                 background: qlineargradient(x1:0,y1:0,x2:1,y2:0,
-                    stop:0 {T.ACC}, stop:1 {T.INF});
-                border-radius: 3px;
+                    stop:0 {T.ACCENT}, stop:1 #06B6D4);
             }}
         """)
         lay.addWidget(self.progress)
 
-        self.lbl_progress = QLabel("")
-        self.lbl_progress.setStyleSheet(f"color: {T.FGM}; font: 12px {T.F};")
-        lay.addWidget(self.lbl_progress)
+        lay.addWidget(self._make_table(), stretch=1)
+        lay.addWidget(self._make_status_strip())
+        return area
 
-        return panel
-    
-    # ─── PREVIEW ──────────────────────────────
-    def _make_preview_panel(self) -> QWidget:
-        panel = QWidget()
-        lay = QVBoxLayout(panel)
-        lay.setSpacing(6)
-        lay.setContentsMargins(0, 0, 0, 0)
-        
-        lbl = QLabel("  👁  Vista Previa del Archivo")
-        lbl.setStyleSheet(f"color: {T.FG}; font: 700 14px {T.F}; padding: 4px 0;")
-        lay.addWidget(lbl)
-        
-        self.preview_text = QTextEdit()
-        self.preview_text.setReadOnly(True)
-        self.preview_text.setPlaceholderText("Cargue un archivo para ver su contenido aquí...")
-        self.preview_text.setStyleSheet(f"""
-            QTextEdit {{
-                background: {T.BG3};
-                color: {T.FG2};
-                border: 1px solid {T.BRD};
-                border-radius: 10px;
-                padding: 12px;
-                font: 11px {T.FM};
-                selection-background-color: {T.ACC}30;
-                selection-color: {T.ACC};
+    def _make_toolbar(self) -> QWidget:
+        tb = QWidget()
+        tb.setFixedHeight(60)
+        tb.setStyleSheet(f"""
+            QWidget {{
+                background: {T.BG};
+                border-bottom: 1px solid {T.BORDER};
             }}
         """)
-        lay.addWidget(self.preview_text, stretch=1)
-        
-        return panel
-    
-    # ─── TABLA DE DATOS ───────────────────────
-    def _make_data_table(self) -> QWidget:
-        w = QWidget()
-        lay = QVBoxLayout(w)
-        lay.setSpacing(6)
-        lay.setContentsMargins(0, 0, 0, 0)
-        
-        row = QHBoxLayout()
-        self.lbl_records = QLabel("")
-        self.lbl_records.setStyleSheet(f"color: {T.FGM}; font: 12px {T.FM};")
-        row.addStretch()
-        row.addWidget(self.lbl_records)
-        lay.addLayout(row)
-        
+        lay = QHBoxLayout(tb)
+        lay.setContentsMargins(24, 0, 24, 0)
+        lay.setSpacing(10)
+
+        self.badge = QLabel("")
+        self._set_badge("neutral", "Sin archivos cargados")
+        lay.addWidget(self.badge)
+        lay.addStretch()
+
+        self.lbl_progress_msg = QLabel("")
+        self.lbl_progress_msg.setStyleSheet(f"color: {T.TEXT_MUTED}; font: 12px {T.F}; background: transparent; border: none;")
+        lay.addWidget(self.lbl_progress_msg)
+
+        # Separador
+        sep = QFrame()
+        sep.setFrameShape(QFrame.VLine)
+        sep.setFixedWidth(1)
+        sep.setFixedHeight(22)
+        sep.setStyleSheet(f"background: {T.BORDER}; border: none;")
+        lay.addWidget(sep)
+
+        self.btn_process = QPushButton("⚡  PROCESAR")
+        self.btn_process.setCursor(Qt.PointingHandCursor)
+        self.btn_process.setFixedHeight(38)
+        self.btn_process.setMinimumWidth(138)
+        self.btn_process.setEnabled(False)
+        self.btn_process.clicked.connect(self._on_process)
+        self.btn_process.setStyleSheet(f"""
+            QPushButton {{
+                background: {T.ACCENT};
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 0 20px;
+                font: 700 13px {T.F};
+                letter-spacing: 0.2px;
+            }}
+            QPushButton:hover   {{ background: {T.ACCENT_H}; }}
+            QPushButton:pressed {{ background: {T.ACCENT_P}; }}
+            QPushButton:disabled {{
+                background: {T.BG_ACTIVE};
+                color: {T.TEXT_DIS};
+            }}
+        """)
+        lay.addWidget(self.btn_process)
+
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.VLine)
+        sep2.setFixedWidth(1)
+        sep2.setFixedHeight(22)
+        sep2.setStyleSheet(f"background: {T.BORDER}; border: none;")
+        lay.addWidget(sep2)
+
+        self.btn_csv = self._outline_btn("CSV")
+        self.btn_csv.clicked.connect(self._on_export_csv)
+        self.btn_csv.setEnabled(False)
+        lay.addWidget(self.btn_csv)
+
+        self.btn_excel = self._solid_btn("Excel  .xlsx")
+        self.btn_excel.clicked.connect(self._on_export_excel)
+        self.btn_excel.setEnabled(False)
+        lay.addWidget(self.btn_excel)
+
+        return tb
+
+    def _make_table(self) -> QWidget:
         self.table = QTableWidget()
-        self.table.setMinimumHeight(200)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
+        self.table.setFocusPolicy(Qt.NoFocus)
         self.table.setStyleSheet(f"""
             QTableWidget {{
-                background: {T.BG3}; color: {T.FG};
-                border: 1px solid {T.BRD}; border-radius: 10px;
-                font: 12px {T.FM};
-                selection-background-color: {T.ACC}30;
-                selection-color: {T.ACC};
-                outline: none; gridline-color: transparent;
+                background: {T.BG};
+                color: {T.TEXT};
+                border: none;
+                font: 13px {T.F};
+                selection-background-color: {T.ACCENT_LIGHT};
+                selection-color: {T.TEXT};
+                outline: none;
+                gridline-color: transparent;
             }}
             QTableWidget::item {{
-                padding: 8px 12px;
-                border-bottom: 1px solid {T.BG2};
+                padding: 10px 16px;
+                border-bottom: 1px solid {T.BORDER};
             }}
-            QTableWidget::item:alternate {{ background: {T.BGA}; }}
+            QTableWidget::item:alternate {{ background: {T.BG_ALT}; }}
+            QTableWidget::item:selected  {{ background: {T.ACCENT_LIGHT}; }}
             QHeaderView::section {{
-                background: {T.BG0}; color: {T.ACC};
-                font: 700 12px {T.F};
-                padding: 10px 12px; border: none;
-                border-bottom: 2px solid {T.ACC}60;
+                background: {T.BG_HDR_ROW};
+                color: {T.TEXT2};
+                font: 600 11px {T.F};
+                letter-spacing: 0.4px;
+                padding: 10px 16px;
+                border: none;
+                border-bottom: 2px solid {T.BORDER};
+                border-right: 1px solid {T.BORDER};
             }}
+            QHeaderView::section:last-child {{ border-right: none; }}
             QScrollBar:vertical {{
-                background: {T.BG1}; width: 8px; border-radius: 4px;
+                background: {T.BG_SIDEBAR}; width: 8px; border-radius: 4px;
             }}
             QScrollBar::handle:vertical {{
-                background: {T.FGM}; border-radius: 4px; min-height: 30px;
+                background: {T.BORDER_MED}; border-radius: 4px; min-height: 30px;
             }}
+            QScrollBar::handle:vertical:hover {{ background: {T.TEXT_MUTED}; }}
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QScrollBar:horizontal {{
+                background: {T.BG_SIDEBAR}; height: 8px; border-radius: 4px;
+            }}
+            QScrollBar::handle:horizontal {{
+                background: {T.BORDER_MED}; border-radius: 4px;
+            }}
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
         """)
-        
-        # Placeholder
         self._reset_table_placeholder()
-        lay.addWidget(self.table)
-        
-        return w
-    
-    def _reset_table_placeholder(self):
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["Apellido y Nombre", "Rem c/ Aporte", "Líquido"])
-        self.table.setRowCount(1)
-        ph = QTableWidgetItem("⏳  Procesá un archivo para ver datos aquí...")
-        ph.setForeground(QColor(T.FGM))
-        ph.setTextAlignment(Qt.AlignCenter)
-        self.table.setItem(0, 0, ph)
-        self.table.setSpan(0, 0, 1, 3)
-    
-    # ─── FOOTER ───────────────────────────────
-    def _make_footer(self) -> QWidget:
-        w = QWidget()
-        w.setFixedHeight(70)
-        w.setStyleSheet(f"background: {T.BG0}; border-top: 1px solid {T.BRD};")
-        
-        lay = QHBoxLayout(w)
-        lay.setContentsMargins(28, 0, 28, 0)
-        lay.setSpacing(12)
-        
-        step4 = QLabel("  PASO 4  ›  Exportar resultados")
-        step4.setStyleSheet(f"color: {T.FG}; font: 700 13px {T.F};")
-        lay.addWidget(step4)
-        
-        lay.addStretch()
-        
+        return self.table
+
+    def _make_status_strip(self) -> QWidget:
+        bar = QWidget()
+        bar.setFixedHeight(34)
+        bar.setStyleSheet(f"""
+            QWidget {{ background: {T.BG_SIDEBAR}; border-top: 1px solid {T.BORDER}; }}
+        """)
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(24, 0, 24, 0)
+        lay.setSpacing(16)
+
         self.lbl_status = QLabel("")
-        self.lbl_status.setStyleSheet(f"color: {T.FGM}; font: 12px {T.F};")
+        self.lbl_status.setStyleSheet(f"color: {T.TEXT_MUTED}; font: 11px {T.F}; background: transparent; border: none;")
         lay.addWidget(self.lbl_status)
-        
-        self.btn_csv = self._secondary_btn("📋  Exportar CSV")
-        self.btn_csv.clicked.connect(self._on_export_csv)
-        self.btn_csv.setEnabled(False)
-        lay.addWidget(self.btn_csv)
-        
-        self.btn_excel = self._accent_btn("📊  Exportar Excel (.xlsx)")
-        self.btn_excel.clicked.connect(self._on_export_excel)
-        self.btn_excel.setEnabled(False)
-        lay.addWidget(self.btn_excel)
-        
-        return w
-    
-    # ═══════════════════════════════════════════════
-    #  ACCIONES DEL USUARIO
-    # ═══════════════════════════════════════════════
-    
+        lay.addStretch()
+
+        self.lbl_records = QLabel("")
+        self.lbl_records.setStyleSheet(f"color: {T.TEXT_MUTED}; font: 11px {T.F}; background: transparent; border: none;")
+        lay.addWidget(self.lbl_records)
+        return bar
+
+    # ══════════════════════════════════════════════════════
+    #  ACCIONES
+    # ══════════════════════════════════════════════════════
     def _on_load_single(self):
         path, _ = QFileDialog.getOpenFileName(
             self, "Seleccionar archivo", "",
@@ -609,7 +555,7 @@ class MainWindow(QMainWindow):
         )
         if path:
             self._add_files([path])
-    
+
     def _on_load_multiple(self):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Seleccionar archivos", "",
@@ -617,67 +563,29 @@ class MainWindow(QMainWindow):
         )
         if paths:
             self._add_files(paths)
-    
+
     def _add_files(self, paths: List[str]):
-        """Agrega archivos a la lista y muestra preview."""
         self.file_paths = paths
         self.is_processed = False
-        
-        # Actualizar lista visual
+
         self.file_list.clear()
         for p in paths:
-            self.file_list.addItem(QListWidgetItem(f"  📄  {Path(p).name}"))
-        
+            self.file_list.addItem(QListWidgetItem(f"  {Path(p).name}"))
+
         n = len(paths)
-        self.lbl_file_count.setText(f"{n} archivo{'s' if n != 1 else ''}")
         self._set_badge("info", f"{n} archivo{'s' if n != 1 else ''} cargado{'s' if n != 1 else ''}")
-        
-        # Habilitar botón procesar
         self.btn_process.setEnabled(True)
-        
-        # Deshabilitar export (hay que procesar primero)
         self.btn_excel.setEnabled(False)
         self.btn_csv.setEnabled(False)
         self._reset_table_placeholder()
         self.lbl_records.setText("")
-        
-        # Mostrar preview del primer archivo
-        self._show_text_preview(paths[0])
-    
-    def _show_text_preview(self, path: str):
-        """Muestra las primeras líneas del archivo en el panel de preview."""
-        try:
-            # Intentar UTF-8
-            try:
-                with open(path, 'r', encoding='utf-8') as f:
-                    text = f.read(5000)
-            except UnicodeDecodeError:
-                with open(path, 'r', encoding='latin-1') as f:
-                    text = f.read(5000)
-            
-            # Limpiar un poco para que se lea mejor
-            lines = text.split('\n')
-            clean = []
-            for line in lines[:120]:
-                stripped = line.rstrip('\r')
-                # Acortar líneas de puros guiones
-                if len(stripped) > 40 and all(c == '_' for c in stripped):
-                    clean.append("─" * 60)
-                else:
-                    clean.append(stripped)
-            
-            self.preview_text.setPlainText('\n'.join(clean))
-            
-        except Exception as e:
-            self.preview_text.setPlainText(f"No se pudo leer el archivo:\n{str(e)}")
-    
+        self.lbl_status.setText("")
+        self.lbl_progress_msg.setText("")
+
     def _on_process(self):
-        """El usuario presionó PROCESAR."""
         if not self.file_paths:
-            QMessageBox.warning(self, "Sin archivos", "Cargá al menos un archivo primero.")
             return
-        
-        # Deshabilitar controles durante el procesamiento
+
         self.btn_process.setEnabled(False)
         self.btn_load.setEnabled(False)
         self.btn_load_multi.setEnabled(False)
@@ -686,348 +594,376 @@ class MainWindow(QMainWindow):
         self.progress.setVisible(True)
         self.progress.setValue(0)
         self._set_badge("warn", "Procesando...")
-        self.lbl_progress.setText("Iniciando extracción...")
-        self.lbl_progress.setStyleSheet(f"color: {T.WARN}; font: 12px {T.F};")
-        
-        # Lanzar thread
+        self.lbl_status.setText("Extrayendo datos...")
+
         self._thread = ProcessThread(self.file_paths)
         self._thread.progress.connect(self._on_progress)
         self._thread.finished.connect(self._on_finished)
         self._thread.error.connect(self._on_error)
         self._thread.start()
-    
+
     def _on_progress(self, value: int, msg: str):
         self.progress.setValue(value)
-        self.lbl_progress.setText(msg)
-    
+        self.lbl_progress_msg.setText(msg)
+
     def _on_finished(self, blocks: List[RawEmployeeBlock]):
-        """Extracción exitosa → consolidar y mostrar en tabla."""
         self.raw_blocks = blocks
-        
-        # Leer configuración de ordenamiento
         sort_alpha = self.radio_alpha.isChecked()
-        logger.info(f"Ordenamiento: {'Alfabético' if sort_alpha else 'Original del PDF'}")
-        
-        # Consolidar
         self.consolidated = self.processor.consolidate(blocks, sort_alpha)
-        
         self.is_processed = True
-        self.progress.setValue(100)
 
         n_blocks = len(blocks)
-        n_emp = len(self.consolidated)
+        n_emp    = len(self.consolidated)
 
-        self._set_badge("ok", f"✓  {n_blocks} registros → {n_emp} empleados")
-        self.lbl_progress.setText(f"✅  {n_blocks} registros extraídos, {n_emp} empleados únicos")
-        self.lbl_progress.setStyleSheet(f"color: {T.OK}; font: 12px {T.F};")
+        self.progress.setValue(100)
+        self._set_badge("ok", f"✓  {n_emp} empleados · {n_blocks} registros")
+        self.lbl_progress_msg.setText("")
+        self.lbl_status.setText(f"Listo — {n_emp} empleados únicos consolidados de {len(self.file_paths)} archivo(s)")
+        self.lbl_status.setStyleSheet(f"color: {T.OK}; font: 11px {T.F}; background: transparent; border: none;")
 
-        # Habilitar controles
         self.btn_process.setEnabled(True)
         self.btn_load.setEnabled(True)
         self.btn_load_multi.setEnabled(True)
         self.btn_excel.setEnabled(True)
         self.btn_csv.setEnabled(True)
 
-        # Llenar tabla
         self._fill_table()
+        QTimer.singleShot(2200, lambda: self.progress.setVisible(False))
 
-        # Ocultar barra después de 2s (feedback visual sin interrumpir)
-        QTimer.singleShot(2000, lambda: self.progress.setVisible(False))
-    
     def _on_error(self, msg: str):
-        """Error durante la extracción."""
         self.progress.setVisible(False)
-        self._set_badge("err", "Error en procesamiento")
-        self.lbl_progress.setText(f"❌  {msg}")
-        self.lbl_progress.setStyleSheet(f"color: {T.ERR}; font: 12px {T.F};")
-        
+        self._set_badge("err", "Error al procesar")
+        self.lbl_progress_msg.setText("")
+        self.lbl_status.setText(f"Error: {msg}")
+        self.lbl_status.setStyleSheet(f"color: {T.ERR}; font: 11px {T.F}; background: transparent; border: none;")
+
         self.btn_process.setEnabled(True)
         self.btn_load.setEnabled(True)
         self.btn_load_multi.setEnabled(True)
-        
-        QMessageBox.critical(self, "Error", f"Error al procesar:\n\n{msg}")
-    
+        QMessageBox.critical(self, "Error al procesar", msg)
+
+    def _on_column_changed(self):
+        if self.is_processed:
+            self._fill_table()
+
+    def _on_sort_changed(self):
+        if not self.is_processed or not self.raw_blocks:
+            return
+        sort_alpha = self.radio_alpha.isChecked()
+        self.consolidated = self.processor.consolidate(self.raw_blocks, sort_alpha)
+        self._fill_table()
+        order = "alfabético" if sort_alpha else "original del PDF"
+        self._set_badge("ok", f"✓  {len(self.consolidated)} empleados · Orden {order}")
+
+    def _on_clear(self):
+        self.file_paths    = []
+        self.raw_blocks    = []
+        self.consolidated  = []
+        self.is_processed  = False
+
+        self.file_list.clear()
+        self._show_file_placeholder()
+        self._reset_table_placeholder()
+        self.lbl_records.setText("")
+        self.lbl_status.setText("")
+        self.lbl_status.setStyleSheet(f"color: {T.TEXT_MUTED}; font: 11px {T.F}; background: transparent; border: none;")
+        self.lbl_progress_msg.setText("")
+        self._set_badge("neutral", "Sin archivos cargados")
+        self.btn_process.setEnabled(False)
+        self.btn_excel.setEnabled(False)
+        self.btn_csv.setEnabled(False)
+
+    # ══════════════════════════════════════════════════════
+    #  TABLA
+    # ══════════════════════════════════════════════════════
+    def _reset_table_placeholder(self):
+        self.table.setColumnCount(1)
+        self.table.setHorizontalHeaderLabels([""])
+        self.table.setRowCount(1)
+        ph = QTableWidgetItem("Cargá un archivo y presioná  ⚡ PROCESAR  para ver los datos aquí")
+        ph.setForeground(QColor(T.TEXT_MUTED))
+        ph.setTextAlignment(Qt.AlignCenter)
+        self.table.setItem(0, 0, ph)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+
     def _fill_table(self):
-        """Llena la tabla con los datos consolidados."""
         if not self.consolidated:
             return
-        
-        keys = self._get_selected_keys()
+
+        keys         = self._get_selected_keys()
         display_cols = [DISPLAY_NAMES.get(k, k) for k in keys]
-        
+
         self.table.setColumnCount(len(display_cols))
         self.table.setHorizontalHeaderLabels(display_cols)
-        
-        # Mostrar max 100 filas en preview
-        data = self.consolidated[:100]
-        self.table.setRowCount(len(data))
-        
-        for ri, rec in enumerate(data):
+        self.table.setRowCount(len(self.consolidated))
+
+        mono = QFont()
+        mono.setFamilies(["Cascadia Code", "JetBrains Mono", "Consolas"])
+        mono.setPointSize(11)
+
+        for ri, rec in enumerate(self.consolidated):
             for ci, key in enumerate(keys):
                 val = rec.get(key, 0.0)
-                
+
                 if key == 'nombre':
                     item = QTableWidgetItem(str(val))
                     item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-                    item.setForeground(QColor(T.FG))
+                    item.setForeground(QColor(T.TEXT))
                 elif key == 'pct_jub_ley11087':
-                    # Porcentaje: mostrar como entero con %
-                    if isinstance(val, (int, float)) and val > 0:
-                        item = QTableWidgetItem(f"{int(round(val))} %")
-                    else:
-                        item = QTableWidgetItem("—")
+                    text = f"{int(round(val))} %" if isinstance(val, (int, float)) and val > 0 else "—"
+                    item = QTableWidgetItem(text)
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     item.setForeground(QColor(T.WARN))
+                    item.setFont(mono)
                 else:
-                    # Formato argentino
                     if isinstance(val, (int, float)) and val > 0:
                         fmt = f"{val:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
                         item = QTableWidgetItem(f"$ {fmt}")
                     else:
                         item = QTableWidgetItem("—")
                     item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                    item.setForeground(QColor(T.ACC))
-                
+                    item.setForeground(QColor(T.ACCENT_DARK))
+                    item.setFont(mono)
+
                 self.table.setItem(ri, ci, item)
-        
-        # Ajustar columnas
+
         hdr = self.table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.Stretch)
         for i in range(1, len(keys)):
             hdr.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-        
-        total = len(self.consolidated)
-        if total > 100:
-            self.lbl_records.setText(f"Mostrando 100 de {total} empleados")
-        else:
-            self.lbl_records.setText(f"{total} empleados")
-    
+
+        self.lbl_records.setText(f"{len(self.consolidated)} empleados")
+
     def _get_selected_keys(self) -> List[str]:
-        """Retorna las claves internas de columnas seleccionadas, en orden."""
-        keys = ['nombre']  # Siempre
-        
-        # Orden fijo para consistencia
-        order = ['rem_con_aporte', 'liquido', 'retroactivos_sin_aporte', 'retroactivos_con_aporte',
-                 'complemento_remunerativo', 'ajuste_apross',
-                 'descuento_apross_familiar', 'pct_jub_ley11087']
-        
-        for k in order:
-            chk = self.col_checks.get(k)
-            if chk and chk.isChecked():
-                keys.append(k)
-        
-        return keys
-    
-    # ─── EXPORTACIÓN ──────────────────────────
+        order = [k for k, *_ in self.COLUMNS]
+        return [k for k in order if self.col_checks.get(k) and self.col_checks[k].isChecked()]
+
+    # ══════════════════════════════════════════════════════
+    #  EXPORTACIÓN
+    # ══════════════════════════════════════════════════════
     def _on_export_excel(self):
         if not self.is_processed:
-            QMessageBox.warning(self, "Sin datos", "Procesá un archivo primero.")
             return
-        
         path, _ = QFileDialog.getSaveFileName(
             self, "Guardar Excel", "liquidaciones.xlsx", "Excel (*.xlsx)"
         )
         if not path:
             return
-        
         try:
-            keys = self._get_selected_keys()
-            df = self.processor.to_dataframe(self.consolidated, keys)
+            keys   = self._get_selected_keys()
+            df     = self.processor.to_dataframe(self.consolidated, keys)
             totals = self.processor.calculate_totals(df)
             self.exporter.export_to_excel(df, path, totals)
-            
             self._set_badge("ok", f"✓  Exportado: {Path(path).name}")
-            self.lbl_status.setText(f"Excel guardado ✓")
-            self.lbl_status.setStyleSheet(f"color: {T.OK}; font: 12px {T.F};")
-            
-            QMessageBox.information(self, "Exportación Exitosa", f"Guardado en:\n{path}")
+            self.lbl_status.setText(f"Excel guardado — {path}")
         except Exception as e:
             logger.error(f"Error Excel: {e}")
-            QMessageBox.critical(self, "Error", f"Error al exportar:\n{str(e)}")
-    
+            QMessageBox.critical(self, "Error al exportar", str(e))
+
     def _on_export_csv(self):
         if not self.is_processed:
-            QMessageBox.warning(self, "Sin datos", "Procesá un archivo primero.")
             return
-        
         path, _ = QFileDialog.getSaveFileName(
             self, "Guardar CSV", "liquidaciones.csv", "CSV (*.csv)"
         )
         if not path:
             return
-        
         try:
             keys = self._get_selected_keys()
-            df = self.processor.to_dataframe(self.consolidated, keys)
+            df   = self.processor.to_dataframe(self.consolidated, keys)
             self.exporter.export_to_csv(df, path)
-            
             self._set_badge("ok", f"✓  Exportado: {Path(path).name}")
-            self.lbl_status.setText(f"CSV guardado ✓")
-            self.lbl_status.setStyleSheet(f"color: {T.OK}; font: 12px {T.F};")
-            
-            QMessageBox.information(self, "Exportación Exitosa", f"Guardado en:\n{path}")
+            self.lbl_status.setText(f"CSV guardado — {path}")
         except Exception as e:
             logger.error(f"Error CSV: {e}")
-            QMessageBox.critical(self, "Error", f"Error al exportar:\n{str(e)}")
-    
-    def _on_column_changed(self):
-        """Actualiza la tabla en tiempo real al cambiar columnas seleccionadas."""
-        if self.is_processed:
-            self._fill_table()
+            QMessageBox.critical(self, "Error al exportar", str(e))
 
-    def _on_sort_changed(self):
-        """Re-ordena datos cuando el usuario cambia el radio, sin re-procesar."""
-        if not self.is_processed or not self.raw_blocks:
-            return
-        
-        sort_alpha = self.radio_alpha.isChecked()
-        logger.info(f"Re-ordenando: {'Alfabético' if sort_alpha else 'Original del PDF'}")
-        
-        self.consolidated = self.processor.consolidate(self.raw_blocks, sort_alpha)
-        self._fill_table()
-        
-        order_name = "alfabético" if sort_alpha else "original del PDF"
-        self._set_badge("ok", f"✓  {len(self.consolidated)} empleados · Orden {order_name}")
-    
-    def _on_clear(self):
-        self.file_paths = []
-        self.raw_blocks = []
-        self.consolidated = []
-        self.is_processed = False
-        
-        self.file_list.clear()
-        self.lbl_file_count.setText("0 archivos")
-        self.preview_text.clear()
-        self._reset_table_placeholder()
-        self.lbl_records.setText("")
-        self.lbl_progress.setText("")
-        self.lbl_status.setText("")
-        self._set_badge("info", "Sin archivos cargados")
-        
-        self.btn_process.setEnabled(False)
-        self.btn_excel.setEnabled(False)
-        self.btn_csv.setEnabled(False)
-    
-    # ═══════════════════════════════════════════════
-    #  FÁBRICAS DE WIDGETS + ESTILOS
-    # ═══════════════════════════════════════════════
-    
-    def _accent_btn(self, text: str) -> QPushButton:
-        b = QPushButton(text)
-        b.setCursor(Qt.PointingHandCursor)
-        b.setMinimumHeight(42)
-        b.setStyleSheet(f"""
-            QPushButton {{
-                background: {T.ACC}; color: {T.BG0}; border: none;
-                padding: 10px 24px; border-radius: 8px;
-                font: 700 13px {T.F};
-            }}
-            QPushButton:hover {{ background: {T.ACH}; }}
-            QPushButton:pressed {{ background: {T.ACP}; }}
-            QPushButton:disabled {{ background: {T.BG3}; color: {T.FGD}; }}
+    # ══════════════════════════════════════════════════════
+    #  BADGE
+    # ══════════════════════════════════════════════════════
+    def _set_badge(self, level: str, text: str):
+        palettes = {
+            "neutral": (T.TEXT_MUTED, T.BG_ACTIVE,  T.BORDER),
+            "info":    (T.INF,        T.INF_BG,      T.INF_BRD),
+            "ok":      (T.OK,         T.OK_BG,       T.OK_BRD),
+            "warn":    (T.WARN,       T.WARN_BG,     T.WARN_BRD),
+            "err":     (T.ERR,        T.ERR_BG,      T.ERR_BRD),
+        }
+        fg, bg, brd = palettes.get(level, palettes["neutral"])
+        self.badge.setText(f"  {text}  ")
+        self.badge.setStyleSheet(f"""
+            color: {fg};
+            background: {bg};
+            border: 1px solid {brd};
+            border-radius: 6px;
+            font: 600 12px {T.F};
+            padding: 3px 8px;
         """)
-        return b
-    
-    def _secondary_btn(self, text: str) -> QPushButton:
-        b = QPushButton(text)
-        b.setCursor(Qt.PointingHandCursor)
-        b.setMinimumHeight(40)
-        b.setStyleSheet(f"""
+
+    # ══════════════════════════════════════════════════════
+    #  ESTILOS DE WIDGETS
+    # ══════════════════════════════════════════════════════
+    def _col_toggle_style(self) -> str:
+        return f"""
             QPushButton {{
-                background: {T.BG3}; color: {T.FG};
-                border: 1px solid {T.BRD}; padding: 9px 20px;
-                border-radius: 8px; font: 600 13px {T.F};
+                background: {T.BG};
+                color: {T.TEXT2};
+                border: 1.5px solid {T.BORDER};
+                border-radius: 7px;
+                padding: 0px 12px;
+                font: 13px {T.F};
+                text-align: left;
             }}
-            QPushButton:hover {{ background: {T.BGH}; border-color: {T.FGM}; }}
-            QPushButton:pressed {{ background: {T.BG1}; }}
-            QPushButton:disabled {{ background: {T.BG2}; color: {T.FGD}; border-color: {T.BG2}; }}
-        """)
-        return b
-    
-    def _danger_btn(self, text: str) -> QPushButton:
-        b = QPushButton(text)
-        b.setCursor(Qt.PointingHandCursor)
-        b.setMinimumHeight(40)
-        b.setStyleSheet(f"""
-            QPushButton {{
-                background: #4a2030; color: {T.ERR};
-                border: 1px solid {T.ERR}40; padding: 9px 20px;
-                border-radius: 8px; font: 600 13px {T.F};
+            QPushButton:checked {{
+                background: {T.ACCENT_LIGHT};
+                color: {T.ACCENT};
+                border-color: {T.ACCENT};
+                font-weight: 700;
             }}
-            QPushButton:hover {{ background: #6a2040; border-color: {T.ERR}80; }}
-            QPushButton:pressed {{ background: #801030; }}
-        """)
-        return b
-    
-    def _card(self, title: str) -> QWidget:
-        c = QWidget()
-        c.setStyleSheet(f"background: {T.BG2}; border: 1px solid {T.BRD}; border-radius: 10px;")
-        lay = QVBoxLayout(c)
-        lay.setSpacing(4)
-        lay.setContentsMargins(16, 14, 16, 14)
-        t = QLabel(title)
-        t.setStyleSheet(f"color: {T.FG}; font: 700 13px {T.F}; border: none; background: transparent;")
-        lay.addWidget(t)
-        return c
-    
-    def _sep(self) -> QFrame:
-        s = QFrame()
-        s.setFixedHeight(1)
-        s.setStyleSheet(f"background: {T.BRD}; border: none;")
-        return s
-    
+            QPushButton:hover:!checked {{
+                background: {T.BG_HOVER};
+                border-color: {T.BORDER_MED};
+            }}
+            QPushButton:disabled {{
+                background: {T.ACCENT_LIGHT};
+                color: {T.ACCENT};
+                border-color: {T.ACCENT};
+                font-weight: 700;
+            }}
+        """
+
     def _radio_style(self) -> str:
         return f"""
             QRadioButton {{
-                color: {T.FG}; font: 13px {T.F}; padding: 6px 4px; spacing: 10px;
+                color: {T.TEXT2};
+                font: 13px {T.F};
+                padding: 5px 2px;
+                spacing: 8px;
+                background: transparent;
+                border: none;
             }}
             QRadioButton::indicator {{
-                width: 18px; height: 18px;
-                border: 2px solid {T.FGM}; border-radius: 10px; background: {T.BG3};
+                width: 15px; height: 15px;
+                border: 2px solid {T.BORDER_MED};
+                border-radius: 8px;
+                background: {T.BG};
             }}
-            QRadioButton::indicator:checked {{ background: {T.ACC}; border-color: {T.ACC}; }}
-            QRadioButton::indicator:hover {{ border-color: {T.ACC}; }}
+            QRadioButton::indicator:checked {{
+                background: {T.ACCENT};
+                border-color: {T.ACCENT};
+            }}
+            QRadioButton::indicator:hover {{ border-color: {T.ACCENT}; }}
         """
-    
-    def _chk_style(self) -> str:
-        return f"""
-            QCheckBox {{
-                color: {T.FG}; font: 13px {T.F}; padding: 7px 4px; spacing: 10px;
+
+    def _ghost_btn(self, text: str) -> QPushButton:
+        b = QPushButton(text)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setFixedHeight(28)
+        b.setStyleSheet(f"""
+            QPushButton {{
+                background: {T.BG};
+                color: {T.TEXT2};
+                border: 1px solid {T.BORDER};
+                border-radius: 6px;
+                padding: 0 10px;
+                font: 600 12px {T.F};
             }}
-            QCheckBox::indicator {{
-                width: 20px; height: 20px;
-                border: 2px solid {T.FGM}; border-radius: 4px; background: {T.BG3};
+            QPushButton:hover  {{ background: {T.BG_HOVER}; border-color: {T.BORDER_MED}; }}
+            QPushButton:pressed {{ background: {T.BG_ACTIVE}; }}
+            QPushButton:disabled {{ color: {T.TEXT_DIS}; }}
+        """)
+        return b
+
+    def _ghost_btn_danger(self, text: str) -> QPushButton:
+        b = QPushButton(text)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setFixedHeight(28)
+        b.setStyleSheet(f"""
+            QPushButton {{
+                background: {T.BG};
+                color: {T.TEXT_MUTED};
+                border: 1px solid {T.BORDER};
+                border-radius: 6px;
+                padding: 0 10px;
+                font: 600 12px {T.F};
             }}
-            QCheckBox::indicator:checked {{ background: {T.ACC}; border-color: {T.ACC}; }}
-            QCheckBox::indicator:hover {{ border-color: {T.ACC}; }}
-            QCheckBox:disabled {{ color: {T.FG2}; }}
-            QCheckBox::indicator:disabled {{ background: {T.ACC}80; border-color: {T.ACC}80; }}
-        """
-    
-    # ─── ESTILOS GLOBALES ─────────────────────
-    def _apply_styles(self):
+            QPushButton:hover  {{ background: {T.ERR_BG}; color: {T.ERR}; border-color: {T.ERR}; }}
+            QPushButton:pressed {{ background: #FFE4E4; }}
+        """)
+        return b
+
+    def _outline_btn(self, text: str) -> QPushButton:
+        b = QPushButton(text)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setFixedHeight(36)
+        b.setStyleSheet(f"""
+            QPushButton {{
+                background: {T.BG};
+                color: {T.TEXT2};
+                border: 1.5px solid {T.BORDER_MED};
+                border-radius: 7px;
+                padding: 0 14px;
+                font: 600 13px {T.F};
+            }}
+            QPushButton:hover  {{ background: {T.BG_HOVER}; border-color: {T.TEXT_MUTED}; }}
+            QPushButton:pressed {{ background: {T.BG_ACTIVE}; }}
+            QPushButton:disabled {{ color: {T.TEXT_DIS}; border-color: {T.BORDER}; }}
+        """)
+        return b
+
+    def _solid_btn(self, text: str) -> QPushButton:
+        b = QPushButton(text)
+        b.setCursor(Qt.PointingHandCursor)
+        b.setFixedHeight(36)
+        b.setStyleSheet(f"""
+            QPushButton {{
+                background: {T.TEXT};
+                color: white;
+                border: none;
+                border-radius: 7px;
+                padding: 0 16px;
+                font: 600 13px {T.F};
+            }}
+            QPushButton:hover  {{ background: {T.TEXT2}; }}
+            QPushButton:pressed {{ background: #0A0A1A; }}
+            QPushButton:disabled {{ background: {T.BG_ACTIVE}; color: {T.TEXT_DIS}; }}
+        """)
+        return b
+
+    # ══════════════════════════════════════════════════════
+    #  SEPARADOR
+    # ══════════════════════════════════════════════════════
+    def _hdivider(self) -> QFrame:
+        f = QFrame()
+        f.setFixedHeight(1)
+        f.setStyleSheet(f"background: {T.BORDER}; border: none;")
+        return f
+
+    # ══════════════════════════════════════════════════════
+    #  ESTILOS GLOBALES
+    # ══════════════════════════════════════════════════════
+    def _apply_global_style(self):
         self.setStyleSheet(f"""
-            QMainWindow {{ background: {T.BG1}; }}
-            QWidget {{ background: {T.BG1}; }}
+            QMainWindow {{ background: {T.BG}; }}
+            QWidget      {{ background: {T.BG}; color: {T.TEXT}; }}
             QToolTip {{
-                background: {T.BG2}; color: {T.FG};
-                border: 1px solid {T.BRD}; border-radius: 6px;
-                padding: 6px 10px; font: 12px {T.F};
+                background: {T.TEXT};
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 5px 9px;
+                font: 12px {T.F};
             }}
-            QMessageBox {{ background: {T.BG2}; color: {T.FG}; }}
-            QMessageBox QLabel {{ color: {T.FG}; font: 13px {T.F}; }}
+            QMessageBox {{ background: {T.BG}; }}
+            QMessageBox QLabel {{ color: {T.TEXT}; font: 13px {T.F}; }}
             QMessageBox QPushButton {{
-                background: {T.ACC}; color: {T.BG0}; border: none;
-                padding: 8px 24px; border-radius: 6px;
-                font: 700 13px {T.F}; min-width: 80px;
+                background: {T.ACCENT};
+                color: white;
+                border: none;
+                padding: 6px 22px;
+                border-radius: 6px;
+                font: 600 13px {T.F};
+                min-width: 70px;
             }}
-            QMessageBox QPushButton:hover {{ background: {T.ACH}; }}
-            QScrollBar:vertical {{
-                background: {T.BG1}; width: 8px; border-radius: 4px;
-            }}
-            QScrollBar::handle:vertical {{
-                background: {T.FGM}; border-radius: 4px; min-height: 30px;
-            }}
-            QScrollBar::handle:vertical:hover {{ background: {T.FG2}; }}
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+            QMessageBox QPushButton:hover {{ background: {T.ACCENT_H}; }}
         """)
