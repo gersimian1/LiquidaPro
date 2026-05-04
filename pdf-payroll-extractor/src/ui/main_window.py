@@ -27,15 +27,15 @@ logger = logging.getLogger(__name__)
 #  TEMA — Claro, profesional, herramienta financiera/contable
 # ═══════════════════════════════════════════════════════════
 class T:
-    BG           = "#FFFFFF"
-    BG_SIDEBAR   = "#F5F5FA"
-    BG_HOVER     = "#EDEDF8"
-    BG_ACTIVE    = "#E6E6F5"
-    BG_ALT       = "#F9F9FC"
-    BG_HDR_ROW   = "#F2F2F8"
+    BG           = "#EEEEF8"
+    BG_SIDEBAR   = "#E2E2EE"
+    BG_HOVER     = "#D8D8EE"
+    BG_ACTIVE    = "#CECEE8"
+    BG_ALT       = "#E8E8F4"
+    BG_HDR_ROW   = "#DCDCEC"
 
-    BORDER       = "#E0E0EC"
-    BORDER_MED   = "#C4C4D8"
+    BORDER       = "#C8C8DC"
+    BORDER_MED   = "#AAAAC4"
 
     TEXT         = "#18182C"
     TEXT2        = "#46466A"
@@ -45,7 +45,7 @@ class T:
     ACCENT       = "#5046E4"
     ACCENT_H     = "#3F35CC"
     ACCENT_P     = "#3028B4"
-    ACCENT_LIGHT = "#ECEAFF"
+    ACCENT_LIGHT = "#DDDAFF"
     ACCENT_DARK  = "#2E28A0"
 
     OK           = "#15803D"
