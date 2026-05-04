@@ -19,6 +19,7 @@ FIELD_MAP = {
     'nombre':                    'nombre',
     'rem_con_aporte':            'rem_con_aporte',
     'retroactivos_sin_aporte':   'retroactivos_sin_aporte',
+    'retroactivos_con_aporte':   'retroactivos_con_aporte',
     'liquido':                   'liquido',
     'complemento_remunerativo':  'complemento_remunerativo',
     'ajuste_apross':             'ajuste_apross',
@@ -31,6 +32,7 @@ DISPLAY_NAMES = {
     'nombre':                    'Apellido y Nombre',
     'rem_con_aporte':            'Rem c/ Aporte',
     'retroactivos_sin_aporte':   'Total Retroactivos sin Aportes',
+    'retroactivos_con_aporte':   'Total Retroactivos con Aportes',
     'liquido':                   'Líquido',
     'complemento_remunerativo':  'Complemento Remunerativo',
     'ajuste_apross':             'Ajuste Dif. Aporte Mínimo APROSS',
@@ -58,6 +60,7 @@ class DataProcessor:
         accum = defaultdict(lambda: {
             'rem_con_aporte': 0.0,
             'retroactivos_sin_aporte': 0.0,
+            'retroactivos_con_aporte': 0.0,
             'liquido': 0.0,
             'complemento_remunerativo': 0.0,
             'ajuste_apross': 0.0,
@@ -70,6 +73,7 @@ class DataProcessor:
             name = b.nombre
             accum[name]['rem_con_aporte'] += b.rem_con_aporte
             accum[name]['retroactivos_sin_aporte'] += b.retroactivos_sin_aporte
+            accum[name]['retroactivos_con_aporte'] += b.retroactivos_con_aporte
             accum[name]['liquido'] += b.liquido
             accum[name]['complemento_remunerativo'] += b.complemento_remunerativo
             accum[name]['ajuste_apross'] += b.ajuste_apross
@@ -87,6 +91,7 @@ class DataProcessor:
             row = {'nombre': name}
             row['rem_con_aporte'] = accum[name]['rem_con_aporte']
             row['retroactivos_sin_aporte'] = accum[name]['retroactivos_sin_aporte']
+            row['retroactivos_con_aporte'] = accum[name]['retroactivos_con_aporte']
             row['liquido'] = accum[name]['liquido']
             row['complemento_remunerativo'] = accum[name]['complemento_remunerativo']
             row['ajuste_apross'] = accum[name]['ajuste_apross']

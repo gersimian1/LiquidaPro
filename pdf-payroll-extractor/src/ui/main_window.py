@@ -377,6 +377,12 @@ class MainWindow(QMainWindow):
         chk_rsa.setStyleSheet(cs)
         self.col_checks['retroactivos_sin_aporte'] = chk_rsa
         c2.addWidget(chk_rsa)
+
+        chk_rca = QCheckBox("  Total Retroactivos con Aportes")
+        chk_rca.setChecked(False)
+        chk_rca.setStyleSheet(cs)
+        self.col_checks['retroactivos_con_aporte'] = chk_rca
+        c2.addWidget(chk_rca)
         c2.addWidget(self._sep())
 
         # Opcionales
@@ -802,7 +808,7 @@ class MainWindow(QMainWindow):
         keys = ['nombre']  # Siempre
         
         # Orden fijo para consistencia
-        order = ['rem_con_aporte', 'liquido', 'retroactivos_sin_aporte',
+        order = ['rem_con_aporte', 'liquido', 'retroactivos_sin_aporte', 'retroactivos_con_aporte',
                  'complemento_remunerativo', 'ajuste_apross',
                  'descuento_apross_familiar', 'pct_jub_ley11087']
         
