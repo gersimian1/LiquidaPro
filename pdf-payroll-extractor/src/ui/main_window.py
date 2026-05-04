@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QScrollArea, QAbstractItemView, QListWidgetItem,
     QTextEdit, QSizePolicy, QButtonGroup
 )
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtGui import QColor, QFont
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -186,7 +186,7 @@ class MainWindow(QMainWindow):
         
         # PASO 3: Tabla
         body_lay.addWidget(self._make_step_label("PASO 3", "Revisar datos extraídos"))
-        body_lay.addWidget(self._make_data_table())
+        body_lay.addWidget(self._make_data_table(), stretch=2)
         
         root.addWidget(body, stretch=1)
         
@@ -272,7 +272,7 @@ class MainWindow(QMainWindow):
         lay.addLayout(row)
         
         self.file_list = QListWidget()
-        self.file_list.setMaximumHeight(72)
+        self.file_list.setMaximumHeight(140)
         self.file_list.setStyleSheet(f"""
             QListWidget {{
                 background: {T.BG3}; color: {T.FG};
@@ -362,25 +362,29 @@ class MainWindow(QMainWindow):
         chk_r.setChecked(True)
         chk_r.setStyleSheet(cs)
         chk_r.toggled.connect(lambda checked: self.col_checks['liquido'].setChecked(checked))
+        chk_r.toggled.connect(lambda _: self._on_column_changed())
         self.col_checks['rem_con_aporte'] = chk_r
         c2.addWidget(chk_r)
-        
+
         chk_l = QCheckBox("  Líquido")
         chk_l.setChecked(True)
         chk_l.setStyleSheet(cs)
         chk_l.toggled.connect(lambda checked: self.col_checks['rem_con_aporte'].setChecked(checked))
+        chk_l.toggled.connect(lambda _: self._on_column_changed())
         self.col_checks['liquido'] = chk_l
         c2.addWidget(chk_l)
 
         chk_rsa = QCheckBox("  Total Retroactivos sin Aportes")
         chk_rsa.setChecked(False)
         chk_rsa.setStyleSheet(cs)
+        chk_rsa.toggled.connect(lambda _: self._on_column_changed())
         self.col_checks['retroactivos_sin_aporte'] = chk_rsa
         c2.addWidget(chk_rsa)
 
         chk_rca = QCheckBox("  Total Retroactivos con Aportes")
         chk_rca.setChecked(False)
         chk_rca.setStyleSheet(cs)
+        chk_rca.toggled.connect(lambda _: self._on_column_changed())
         self.col_checks['retroactivos_con_aporte'] = chk_rca
         c2.addWidget(chk_rca)
         c2.addWidget(self._sep())
@@ -399,16 +403,21 @@ class MainWindow(QMainWindow):
             chk = QCheckBox(f"  {display}")
             chk.setChecked(False)
             chk.setStyleSheet(cs)
+            chk.toggled.connect(lambda _: self._on_column_changed())
             self.col_checks[key] = chk
             c2.addWidget(chk)
         
         inner_lay.addWidget(card2)
-        
+        inner_lay.addStretch()
+
+        scroll.setWidget(inner)
+        lay.addWidget(scroll, stretch=1)
+
         # ══════════════════════════════════════════
-        #  BOTÓN PROCESAR — El más importante
+        #  BOTÓN PROCESAR — siempre visible, fuera del scroll
         # ══════════════════════════════════════════
-        inner_lay.addSpacing(8)
-        
+        lay.addSpacing(8)
+
         self.btn_process = QPushButton("⚡  PROCESAR")
         self.btn_process.setCursor(Qt.PointingHandCursor)
         self.btn_process.setMinimumHeight(52)
@@ -437,8 +446,8 @@ class MainWindow(QMainWindow):
                 color: {T.FGD};
             }}
         """)
-        inner_lay.addWidget(self.btn_process)
-        
+        lay.addWidget(self.btn_process)
+
         # Progress
         self.progress = QProgressBar()
         self.progress.setVisible(False)
@@ -452,16 +461,12 @@ class MainWindow(QMainWindow):
                 border-radius: 3px;
             }}
         """)
-        inner_lay.addWidget(self.progress)
-        
+        lay.addWidget(self.progress)
+
         self.lbl_progress = QLabel("")
         self.lbl_progress.setStyleSheet(f"color: {T.FGM}; font: 12px {T.F};")
-        inner_lay.addWidget(self.lbl_progress)
-        
-        inner_lay.addStretch()
-        
-        scroll.setWidget(inner)
-        lay.addWidget(scroll)
+        lay.addWidget(self.lbl_progress)
+
         return panel
     
     # ─── PREVIEW ──────────────────────────────
@@ -510,7 +515,6 @@ class MainWindow(QMainWindow):
         
         self.table = QTableWidget()
         self.table.setMinimumHeight(200)
-        self.table.setMaximumHeight(320)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -709,31 +713,26 @@ class MainWindow(QMainWindow):
         
         self.is_processed = True
         self.progress.setValue(100)
-        self.progress.setVisible(False)
-        
+
         n_blocks = len(blocks)
         n_emp = len(self.consolidated)
-        
+
         self._set_badge("ok", f"✓  {n_blocks} registros → {n_emp} empleados")
         self.lbl_progress.setText(f"✅  {n_blocks} registros extraídos, {n_emp} empleados únicos")
         self.lbl_progress.setStyleSheet(f"color: {T.OK}; font: 12px {T.F};")
-        
+
         # Habilitar controles
         self.btn_process.setEnabled(True)
         self.btn_load.setEnabled(True)
         self.btn_load_multi.setEnabled(True)
         self.btn_excel.setEnabled(True)
         self.btn_csv.setEnabled(True)
-        
+
         # Llenar tabla
         self._fill_table()
-        
-        QMessageBox.information(
-            self, "Procesamiento Completo",
-            f"Se extrajeron {n_blocks} registros de {len(self.file_paths)} archivo(s).\n"
-            f"Consolidados en {n_emp} empleados únicos.\n\n"
-            f"Podés exportar a Excel o CSV con los botones del pie de página."
-        )
+
+        # Ocultar barra después de 2s (feedback visual sin interrumpir)
+        QTimer.singleShot(2000, lambda: self.progress.setVisible(False))
     
     def _on_error(self, msg: str):
         """Error durante la extracción."""
@@ -871,6 +870,11 @@ class MainWindow(QMainWindow):
             logger.error(f"Error CSV: {e}")
             QMessageBox.critical(self, "Error", f"Error al exportar:\n{str(e)}")
     
+    def _on_column_changed(self):
+        """Actualiza la tabla en tiempo real al cambiar columnas seleccionadas."""
+        if self.is_processed:
+            self._fill_table()
+
     def _on_sort_changed(self):
         """Re-ordena datos cuando el usuario cambia el radio, sin re-procesar."""
         if not self.is_processed or not self.raw_blocks:
